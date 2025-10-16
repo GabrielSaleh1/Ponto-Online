@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bate Ponto Online</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/timezone.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/duration.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-900">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-6">Bate Ponto Online</h1>
+
+    <section id="loginSection" class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">Identificação</h2>
+      <p class="text-sm text-slate-600 mb-4">Informe apenas seu QRA e número de crachá para registrar o ponto.</p>
+      <form id="idForm" class="flex flex-col sm:flex-row gap-3">
+        <input id="nicknameInput" type="text" required placeholder="QRA" class="flex-1 px-4 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input id="badgeInput" type="text" placeholder="Crachá (opcional)" class="flex-1 px-4 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <button class="px-5 py-2 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700">Entrar</button>
+      </form>
+    </section>
+
+    <section id="mainSection" class="hidden">
+      <div class="glass rounded-2xl shadow p-5 mb-6">
+        <h2 class="text-2xl font-semibold mb-2">Status</h2>
+        <p id="statusText" class="text-slate-700">Fora de patrulha</p>
+        <p id="runningTimer" class="text-3xl font-bold mt-2">00:00:00</p>
+        <div class="mt-4 flex gap-3">
+          <button id="btnStart" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">Iniciar patrulha</button>
+          <button id="btnStop"  class="px-4 py-2 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 hidden">Encerrar</button>
+        </div>
+      </div>
+      <div class="glass rounded-2xl shadow p-5">
+        <h3 class="text-lg font-semibold mb-4">Batidas registradas</h3>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-600 border-b">
+              <th class="py-2">Início</th>
+              <th class="py-2">Término</th>
+              <th class="py-2">Duração</th>
+              <th class="py-2">Observações</th>
+            </tr>
+          </thead>
+          <tbody id="shiftTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
+  const TZ = 'America/Sao_Paulo';
+  let supabaseClient, nickname, badge, activeShift=null, timerInterval=null;
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    dayjs.extend(window.dayjs_plugin_utc);
+    dayjs.extend(window.dayjs_plugin_timezone);
+    dayjs.extend(window.dayjs_plugin_duration);
+    dayjs.tz.setDefault(TZ);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    document.getElementById('idForm').addEventListener('submit', e => {
+      e.preventDefault();
+      nickname = document.getElementById('nicknameInput').value.trim();
+      badge = document.getElementById('badgeInput').value.trim();
+      if (!nickname) return alert('Informe seu QRA.');
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('mainSection').classList.remove('hidden');
+      refreshState();
+    });
+
+    document.getElementById('btnStart').addEventListener('click', startShift);
+    document.getElementById('btnStop').addEventListener('click', endShift);
+  });
+
+  async function refreshState(){
+    const { data } = await supabaseClient.from('shifts').select('*').eq('nickname', nickname).is('ended_at', null).order('started_at', { ascending: false }).limit(1);
+    activeShift = data && data[0] ? data[0] : null;
+
+    if (activeShift) {
+      document.getElementById('statusText').textContent = 'Em patrulha desde ' + fmtDate(activeShift.started_at);
+      document.getElementById('btnStart').classList.add('hidden');
+      document.getElementById('btnStop').classList.remove('hidden');
+      runTimer();
+    } else {
+      document.getElementById('statusText').textContent = 'Fora de patrulha';
+      document.getElementById('btnStart').classList.remove('hidden');
+      document.getElementById('btnStop').classList.add('hidden');
+      stopTimer();
+      document.getElementById('runningTimer').textContent = '00:00:00';
+    }
+    loadMyShifts();
+  }
+
+  async function startShift(){
+    if (activeShift) return;
+    const note = prompt('Observação (opcional): Ex.: Unidade, setor, viatura...');
+    const { data, error } = await supabaseClient.from('shifts').insert([{ nickname, badge, started_at: new Date().toISOString(), note }]).select().single();
+    if (error) return alert('Erro: '+error.message);
+    activeShift = data;
+    refreshState();
+  }
+
+  async function endShift(){
+    if (!activeShift) return;
+    const { error } = await supabaseClient.from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
+    if (error) return alert('Erro: '+error.message);
+    activeShift=null;
+    refreshState();
+  }
+
+  async function loadMyShifts(){
+    const { data } = await supabaseClient.from('shifts').select('*').eq('nickname', nickname).order('started_at', { ascending: false });
+    const tbody = document.getElementById('shiftTable');
+    tbody.innerHTML='';
+    data.forEach(s=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class='py-2 pr-3'>${fmtDate(s.started_at)}</td>
+                    <td class='py-2 pr-3'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-amber-700">em andamento…</span>'}</td>
+                    <td class='py-2 pr-3'>${s.ended_at?fmtDur(calcMinutes(s.started_at,s.ended_at)):'—'}</td>
+                    <td class='py-2'>${s.note||''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function runTimer(){stopTimer();timerInterval=setInterval(()=>{const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());},1000);}
+  function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
+
+  function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
+  function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
+  function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
+  function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
+  </script>
+</body>
+</html>
