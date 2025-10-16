@@ -255,7 +255,6 @@
     const { data: officers } = await supabaseClient
       .from('officers')
       .select('id,name,current_rank_id,active')
-      .eq('active', true)
       .order('name', { ascending: true });
 
     const { data: ranks } = await supabaseClient
@@ -308,4 +307,3 @@
   </script>
 </body>
 </html>
-
