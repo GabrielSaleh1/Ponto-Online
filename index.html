@@ -106,8 +106,8 @@
   const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
-  const META_MIN = 10*60;
-  const LEVE_MIN = 7*60;
+  const META_MIN = 10*60; // minutos
+  const LEVE_MIN = 7*60;  // minutos
 
   let supabaseClient, activeShift=null, timerInterval=null;
   let currentOfficer=null;
@@ -130,12 +130,21 @@
     await loadLists();
   });
 
+  // ---------- Helpers ----------
   function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
   function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
-  function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
   function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
-  function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
 
+  // >>> NOVO: formata duração a partir de segundos (ex.: 1h23m45s)
+  function fmtDurSecs(totalSeconds){
+    const secs = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(secs/3600);
+    const m = Math.floor((secs%3600)/60);
+    const s = secs%60;
+    return `${h}h${m}m${s}s`;
+  }
+
+  // ---------- Listas ----------
   async function loadLists(){
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
@@ -174,6 +183,7 @@
     if (rSel.options.length) rSel.selectedIndex = 0;
   }
 
+  // ---------- Fluxo principal ----------
   async function enterApp(){
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
@@ -251,10 +261,13 @@
     const tbody = document.getElementById('shiftTable');
     tbody.innerHTML='';
     (data||[]).forEach(s=>{
+      const durationSecs = s.ended_at
+        ? Math.max(0, Math.floor(dayjs(s.ended_at).diff(dayjs(s.started_at), 'second')))
+        : 0;
       const tr=document.createElement('tr');
       tr.innerHTML=`<td class='py-2 pr-3'>${fmtDate(s.started_at)}</td>
                     <td class='py-2 pr-3'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-amber-700">em andamento…</span>'}</td>
-                    <td class='py-2 pr-3'>${s.ended_at?fmtDur(calcMinutes(s.started_at,s.ended_at)):'—'}</td>`;
+                    <td class='py-2 pr-3'>${s.ended_at?fmtDurSecs(durationSecs):'—'}</td>`;
       tbody.appendChild(tr);
     });
   }
@@ -262,7 +275,7 @@
   function runTimer(){stopTimer();timerInterval=setInterval(()=>{const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());},1000);}
   function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
 
-  // ====== Estatísticas semanais ======
+  // ---------- Estatísticas semanais ----------
   document.addEventListener('click', (e)=>{
     if (e.target && e.target.id === 'btnPrevWeek') { changeWeek(-1); }
     if (e.target && e.target.id === 'btnNextWeek') { changeWeek(1); }
@@ -288,18 +301,16 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
-  // >>> Patente no ranking = última patente usada em shift na semana; se não teve, última antes do fim da semana
+  // Patente = última usada na semana; se não teve, última antes do fim da semana
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    // lista de policiais e ranks
     const { data: officers } = await supabaseClient
       .from('officers').select('id,name,current_rank_id').order('name', { ascending: true });
     const { data: ranks } = await supabaseClient
       .from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
-
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
     // shifts que tocam a semana
@@ -311,7 +322,7 @@
       .lt('started_at', startIso).or(`ended_at.is.null,ended_at.gte.${startIso}`);
     const allShifts = [...(sA||[]), ...(sB||[])];
 
-    // agrupa
+    // agrupa por policial
     const grouped = new Map();
     for (const s of allShifts) {
       if (!s.officer_id) continue;
@@ -320,13 +331,13 @@
       grouped.set(s.officer_id, arr);
     }
 
-    // totais e última patente usada na semana
-    const totalsMap = new Map();
+    // totais (em segundos) e última patente usada
+    const totalsSecs = new Map();   // officer_id -> total segundos na semana
     const lastRankInWeek = new Map();
 
     for (const [officerId, list] of grouped.entries()) {
       list.sort((a,b)=> dayjs(a.started_at).valueOf() - dayjs(b.started_at).valueOf());
-      let totalMins = 0;
+      let total = 0;
       let lastRank = null;
       let lastStart = null;
 
@@ -335,16 +346,16 @@
         const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs();
         const clampStart = sStart.isAfter(start) ? sStart : start;
         const clampEnd = sEnd.isBefore(end) ? sEnd : end;
-        const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
-        if (mins > 0) {
-          totalMins += mins;
+        const secs = Math.max(0, Math.floor(clampEnd.diff(clampStart, 'second')));
+        if (secs > 0) {
+          total += secs;
           if (!lastStart || sStart.isAfter(lastStart)) {
             lastStart = sStart;
             lastRank = s.rank_id ?? lastRank;
           }
         }
       }
-      totalsMap.set(officerId, totalMins);
+      totalsSecs.set(officerId, total);
       if (lastRank) lastRankInWeek.set(officerId, lastRank);
     }
 
@@ -368,24 +379,24 @@
 
     // se officers vier vazio por RLS, tenta ao menos os IDs que têm total
     let officersList = officers || [];
-    if ((!officersList || officersList.length === 0) && totalsMap.size) {
-      const ids = [...totalsMap.keys()];
+    if ((!officersList || officersList.length === 0) && totalsSecs.size) {
+      const ids = [...totalsSecs.keys()];
       const { data: off2 } = await supabaseClient
         .from('officers').select('id,name,current_rank_id').in('id', ids);
       officersList = off2 || [];
     }
 
     const rows = (officersList||[]).map(o=>{
-      const mins = totalsMap.get(o.id) || 0;
+      const secs = totalsSecs.get(o.id) || 0;
       const rankIdToShow = lastRankInWeek.get(o.id) ?? o.current_rank_id ?? null;
       const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
 
       let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
-      if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
-      else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
+      if (secs < LEVE_MIN*60){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
+      else if (secs < META_MIN*60){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
 
-      return { officer:o.name, rank: rankName, mins, status, badgeClass };
-    }).sort((a,b)=> b.mins - a.mins);
+      return { officer:o.name, rank: rankName, secs, status, badgeClass };
+    }).sort((a,b)=> b.secs - a.secs);
 
     const tbody = document.getElementById('rankTable');
     if (!tbody) return;
@@ -402,7 +413,7 @@
         <td class='py-2 pr-3'>${i+1}</td>
         <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
         <td class='py-2 pr-3 whitespace-nowrap'>${escapeHtml(r.rank)}</td>
-        <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
+        <td class='py-2 pr-3'>${fmtDurSecs(r.secs)}</td>
         <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
       tbody.appendChild(tr);
     });
