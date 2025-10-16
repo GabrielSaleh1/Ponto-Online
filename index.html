@@ -36,7 +36,7 @@
       <p id="loginMsg" class="text-sm text-slate-600 mt-2"></p>
     </section>
 
-    <!-- AQUI: stats ganhou mais espaço no desktop -->
+    <!-- Grid mais largo: Status (2 col) + Estatísticas (3 col) no desktop -->
     <div id="contentGrid" class="grid gap-6 items-start lg:grid-cols-5">
       <!-- Painel principal (2 colunas) -->
       <section id="mainSection" class="hidden lg:col-span-2">
@@ -85,7 +85,6 @@
           <button id="btnThisWeek" class="ml-auto px-3 py-1.5 rounded border">Esta semana</button>
         </div>
         <div class="overflow-x-auto">
-          <!-- AQUI: tipografia um pouco maior -->
           <table class="w-full text-base">
             <thead>
               <tr class="text-left text-slate-600 border-b">
@@ -167,38 +166,34 @@
 
     loginMsg.textContent = '';
 
-    // quando mudar o policial, setar a patente do último ponto
+    // quando mudar o policial, NÃO travamos nada, só oferecemos um preenchimento automático
     oSel.addEventListener('change', () => { setDefaultRankForOfficer(oSel.value); });
 
-    // ao carregar a lista pela primeira vez, já setar para o policial selecionado
+    // ao carregar a lista pela primeira vez, sugerir a última patente usada
     if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
   }
 
-  // Define a patente com base no último turno desse policial (fallback: current_rank_id; fallback2: primeira opção)
+  // Sugere no select a ÚLTIMA patente usada pelo policial (não trava a escolha)
   async function setDefaultRankForOfficer(officerId) {
     const rSel = document.getElementById('rankSelect');
-
-    // 1) tenta pegar o último shift desse policial com rank_id setado
-    const { data: lastShift, error } = await supabaseClient
+    // tenta pegar o último shift desse policial com rank_id setado
+    const { data: lastShift } = await supabaseClient
       .from('shifts')
       .select('rank_id')
       .eq('officer_id', officerId)
       .not('rank_id', 'is', null)
       .order('started_at', { ascending: false })
       .limit(1);
-
-    if (!error && lastShift && lastShift.length && lastShift[0].rank_id) {
+    if (lastShift && lastShift.length && lastShift[0].rank_id) {
       rSel.value = String(lastShift[0].rank_id);
       return;
     }
-
-    // 2) fallback: usar current_rank_id do cadastro do officer
+    // fallback: usar current_rank_id cadastrado
     const oSel = document.getElementById('officerSelect');
     const opt = oSel.options[oSel.selectedIndex];
     const defRank = opt?.getAttribute('data-rank');
     if (defRank) { rSel.value = String(defRank); return; }
-
-    // 3) último fallback: primeira opção
+    // fallback final: primeira opção
     if (rSel.options.length) rSel.selectedIndex = 0;
   }
 
@@ -208,9 +203,8 @@
     const rSel = document.getElementById('rankSelect');
     if (!oSel.value) return alert('Selecione o policial.');
 
-    // garante que o rank esteja no último usado antes de continuar
-    await setDefaultRankForOfficer(oSel.value);
-    if (!rSel.value) return alert('Selecione a patente.');
+    // não travamos; apenas garantimos que existe um rank selecionado
+    if (!rSel.value) await setDefaultRankForOfficer(oSel.value);
 
     const { data: officer } = await supabaseClient.from('officers').select('id,name').eq('id', oSel.value).single();
     const { data: rank } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
@@ -255,7 +249,7 @@
   async function startShift(){
     if (activeShift) return;
     const note = prompt('Observação (opcional): Ex.: Unidade, setor, viatura...');
-    // **garante que currentRank esteja atualizado do select**
+    // pega o rank selecionado no momento do clique
     const rSel = document.getElementById('rankSelect');
     if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
       const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
@@ -329,12 +323,13 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
-  // >>> PATENTE NA ESTATÍSTICA: última usada no período (ou última até o fim do período), com fallback para current_rank_id
+  // >>> Patente no ranking = última patente usada em shift na semana; se não teve, última antes do fim da semana
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
+    // lista de policiais e ranks
     const { data: officers } = await supabaseClient
       .from('officers')
       .select('id,name,current_rank_id')
@@ -347,81 +342,104 @@
 
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
-    // Totais de minutos (RPC se existir; senão, fallback)
-    let totals = [];
-    try {
-      const rpc = await supabaseClient.rpc('weekly_minutes', { p_start: startIso, p_end: endIso });
-      if (!rpc.error && rpc.data) totals = rpc.data;
-    } catch(_) {}
+    // 1) pega TODOS os shifts que tocam a semana (entram ou atravessam)
+    const { data: sA } = await supabaseClient
+      .from('shifts')
+      .select('officer_id, rank_id, started_at, ended_at')
+      .gte('started_at', startIso)
+      .lt('started_at', endIso);
 
-    if (!totals || totals.length === 0){
-      const { data: sA } = await supabaseClient
-        .from('shifts')
-        .select('officer_id, started_at, ended_at')
-        .gte('started_at', startIso)
-        .lt('started_at', endIso);
+    const { data: sB } = await supabaseClient
+      .from('shifts')
+      .select('officer_id, rank_id, started_at, ended_at')
+      .lt('started_at', startIso)
+      .or(`ended_at.is.null,ended_at.gte.${startIso}`);
 
-      const { data: sB } = await supabaseClient
-        .from('shifts')
-        .select('officer_id, started_at, ended_at')
-        .lt('started_at', startIso)
-        .or(`ended_at.is.null,ended_at.gte.${startIso}`);
+    const allShifts = [...(sA||[]), ...(sB||[])];
 
-      const totalByOfficer = new Map();
-      [...(sA||[]), ...(sB||[])].forEach(s=>{
-        if (!s.officer_id) return;
+    // 2) agrupa por policial
+    const grouped = new Map();
+    for (const s of allShifts) {
+      if (!s.officer_id) continue;
+      const arr = grouped.get(s.officer_id) || [];
+      arr.push(s);
+      grouped.set(s.officer_id, arr);
+    }
+
+    // 3) calcula total de minutos na semana E descobre a ÚLTIMA patente utilizada na semana
+    const totalsMap = new Map();
+    const lastRankInWeek = new Map();
+
+    for (const [officerId, list] of grouped.entries()) {
+      // ordena por started_at asc para facilitar
+      list.sort((a,b)=> dayjs(a.started_at).valueOf() - dayjs(b.started_at).valueOf());
+
+      let totalMins = 0;
+      let lastRank = null;
+      let lastStart = null;
+
+      for (const s of list) {
         const sStart = dayjs(s.started_at);
-        const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs();
+        const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs(); // se aberto, conta até agora (ou até fim da semana no clamp)
         const clampStart = sStart.isAfter(start) ? sStart : start;
         const clampEnd = sEnd.isBefore(end) ? sEnd : end;
         const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
-        if (mins>0) totalByOfficer.set(s.officer_id, (totalByOfficer.get(s.officer_id)||0) + mins);
-      });
-      totals = [...totalByOfficer.entries()].map(([officer_id, minutes]) => ({ officer_id, minutes }));
+        if (mins > 0) {
+          totalMins += mins;
+          // última patente usada = do último shift que tocou a semana
+          if (!lastStart || sStart.isAfter(lastStart)) {
+            lastStart = sStart;
+            lastRank = s.rank_id ?? lastRank;
+          }
+        }
+      }
+      totalsMap.set(officerId, totalMins);
+      if (lastRank) lastRankInWeek.set(officerId, lastRank);
     }
 
-    const totalsMap = new Map();
-    (totals||[]).forEach(t=> totalsMap.set(t.officer_id, t.minutes||0));
-
-    // Pega a ÚLTIMA patente usada pelo policial até o FIM da semana (prioriza turno dentro da semana)
-    // estratégia simples: buscar shifts com rank_id até endIso, ordenados desc, e pegar o primeiro por officer
-    const lastRankByOfficer = new Map();
-    const { data: lastRanksAll } = await supabaseClient
-      .from('shifts')
-      .select('officer_id, rank_id, started_at')
-      .lt('started_at', endIso)
-      .not('rank_id', 'is', null)
-      .order('started_at', { ascending: false });
-
-    if (lastRanksAll) {
-      for (const row of lastRanksAll) {
-        if (!lastRankByOfficer.has(row.officer_id)) {
-          lastRankByOfficer.set(row.officer_id, row.rank_id);
+    // 4) para quem NÃO teve shift na semana, buscar a última patente usada ANTES do fim da semana
+    const officersNeedingFallback = (officers||[])
+      .filter(o => !lastRankInWeek.has(o.id));
+    if (officersNeedingFallback.length) {
+      const ids = officersNeedingFallback.map(o=>o.id);
+      const { data: lastBefore } = await supabaseClient
+        .from('shifts')
+        .select('officer_id, rank_id, started_at')
+        .in('officer_id', ids)
+        .lt('started_at', endIso)
+        .not('rank_id', 'is', null)
+        .order('started_at', { ascending: false });
+      // pega só a primeira ocorrência (mais recente) por officer
+      const seen = new Set();
+      if (lastBefore) {
+        for (const row of lastBefore) {
+          if (seen.has(row.officer_id)) continue;
+          seen.add(row.officer_id);
+          lastRankInWeek.set(row.officer_id, row.rank_id);
         }
       }
     }
 
-    // se officers vier vazio por RLS, busca só os que aparecem nos totais
+    // 5) montar linhas do ranking
     let officersList = officers || [];
-    if ((!officersList || officersList.length === 0) && totals && totals.length){
-      const ids = totals.map(t=>t.officer_id).filter(Boolean);
-      if (ids.length){
-        const { data: off2 } = await supabaseClient
-          .from('officers')
-          .select('id,name,current_rank_id')
-          .in('id', ids);
-        officersList = off2 || [];
-      }
+    // se officers vier vazio por RLS, tenta ao menos os IDs que têm total
+    if ((!officersList || officersList.length === 0) && totalsMap.size) {
+      const ids = [...totalsMap.keys()];
+      const { data: off2 } = await supabaseClient
+        .from('officers')
+        .select('id,name,current_rank_id')
+        .in('id', ids);
+      officersList = off2 || [];
     }
 
     const rows = (officersList||[]).map(o=>{
-      const mins = totalsMap.get(o.id)||0;
+      const mins = totalsMap.get(o.id) || 0;
 
-      // PRIORIDADE DE EXIBIÇÃO DE PATENTE:
-      // 1) última utilizada (lastRankByOfficer) até o fim da semana
-      // 2) current_rank_id cadastrado no officer
+      // prioridade:
+      // 1) última patente usada no período (lastRankInWeek)
+      // 2) current_rank_id cadastrado
       // 3) '-'
-      const rankIdToShow = lastRankByOfficer.get(o.id) ?? o.current_rank_id ?? null;
+      const rankIdToShow = lastRankInWeek.get(o.id) ?? o.current_rank_id ?? null;
       const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
 
       let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
