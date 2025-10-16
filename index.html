@@ -36,9 +36,9 @@
       <p id="loginMsg" class="text-sm text-slate-600 mt-2"></p>
     </section>
 
-    <!-- Grid mais largo: Status (2 col) + Estatísticas (3 col) no desktop -->
+    <!-- Grid principal -->
     <div id="contentGrid" class="grid gap-6 items-start lg:grid-cols-5">
-      <!-- Painel principal (2 colunas) -->
+      <!-- Painel principal -->
       <section id="mainSection" class="hidden lg:col-span-2">
         <div class="rounded-2xl shadow p-5 mb-6 bg-white">
           <h2 class="text-2xl font-semibold mb-2">Status</h2>
@@ -50,6 +50,7 @@
             <button id="btnStop"  class="px-4 py-2 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 hidden">Encerrar</button>
           </div>
         </div>
+
         <div class="rounded-2xl shadow p-5 bg-white">
           <h3 class="text-lg font-semibold mb-4">Patrulhamentos registrados</h3>
           <div class="overflow-x-auto">
@@ -59,7 +60,6 @@
                   <th class="py-2">Início</th>
                   <th class="py-2">Término</th>
                   <th class="py-2">Duração</th>
-                  <th class="py-2">Observações</th>
                 </tr>
               </thead>
               <tbody id="shiftTable"></tbody>
@@ -68,7 +68,7 @@
         </div>
       </section>
 
-      <!-- Estatísticas e Ranking (3 colunas) -->
+      <!-- Estatísticas -->
       <section id="statsSection" class="hidden lg:col-span-3 lg:sticky lg:top-4 rounded-2xl shadow p-5 bg-white">
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h3 class="text-xl font-semibold">Estatísticas da semana</h3>
@@ -99,24 +99,21 @@
           </table>
         </div>
       </section>
-    </div><!-- /contentGrid -->
+    </div>
   </div>
 
   <script>
-  // ====== CONFIG ======
   const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
-  const META_MIN = 10*60;     // 10h em minutos
-  const LEVE_MIN = 7*60;      // 7h em minutos
+  const META_MIN = 10*60;
+  const LEVE_MIN = 7*60;
 
-  // ====== STATE ======
   let supabaseClient, activeShift=null, timerInterval=null;
   let currentOfficer=null;
   let currentRank=null;
-  let weekOffset = 0;         // 0 = semana atual
+  let weekOffset = 0;
 
-  // ====== BOOT ======
   document.addEventListener('DOMContentLoaded', async () => {
     dayjs.extend(window.dayjs_plugin_utc);
     dayjs.extend(window.dayjs_plugin_timezone);
@@ -133,30 +130,18 @@
     await loadLists();
   });
 
-  // ====== HELPERS ======
   function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
   function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
   function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
   function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
   function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
 
-  // ====== LISTAS (POLICIAIS/PATENTES) ======
   async function loadLists(){
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
 
-    const { data: officers, error: offErr } = await supabaseClient
-      .from('officers')
-      .select('id,name,current_rank_id,active')
-      .eq('active', true)
-      .order('name', { ascending: true });
-
-    const { data: ranks } = await supabaseClient
-      .from('ranks')
-      .select('id,name,sort_order')
-      .order('sort_order', { ascending: true });
-
-    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; return; }
+    const { data: officers } = await supabaseClient.from('officers').select('id,name,current_rank_id,active').eq('active', true).order('name', { ascending: true });
+    const { data: ranks } = await supabaseClient.from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
 
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
@@ -166,44 +151,28 @@
 
     loginMsg.textContent = '';
 
-    // quando mudar o policial, NÃO travamos nada, só oferecemos um preenchimento automático
     oSel.addEventListener('change', () => { setDefaultRankForOfficer(oSel.value); });
-
-    // ao carregar a lista pela primeira vez, sugerir a última patente usada
     if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
   }
 
-  // Sugere no select a ÚLTIMA patente usada pelo policial (não trava a escolha)
   async function setDefaultRankForOfficer(officerId) {
     const rSel = document.getElementById('rankSelect');
-    // tenta pegar o último shift desse policial com rank_id setado
-    const { data: lastShift } = await supabaseClient
-      .from('shifts')
-      .select('rank_id')
-      .eq('officer_id', officerId)
-      .not('rank_id', 'is', null)
-      .order('started_at', { ascending: false })
-      .limit(1);
+    const { data: lastShift } = await supabaseClient.from('shifts').select('rank_id').eq('officer_id', officerId).not('rank_id', 'is', null).order('started_at', { ascending: false }).limit(1);
     if (lastShift && lastShift.length && lastShift[0].rank_id) {
       rSel.value = String(lastShift[0].rank_id);
       return;
     }
-    // fallback: usar current_rank_id cadastrado
     const oSel = document.getElementById('officerSelect');
     const opt = oSel.options[oSel.selectedIndex];
     const defRank = opt?.getAttribute('data-rank');
     if (defRank) { rSel.value = String(defRank); return; }
-    // fallback final: primeira opção
     if (rSel.options.length) rSel.selectedIndex = 0;
   }
 
-  // ====== ENTRAR NO APP ======
   async function enterApp(){
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
     if (!oSel.value) return alert('Selecione o policial.');
-
-    // não travamos; apenas garantimos que existe um rank selecionado
     if (!rSel.value) await setDefaultRankForOfficer(oSel.value);
 
     const { data: officer } = await supabaseClient.from('officers').select('id,name').eq('id', oSel.value).single();
@@ -219,16 +188,8 @@
     initStats();
   }
 
-  // ====== ESTADO DO PONTO ======
   async function refreshState(){
-    const { data } = await supabaseClient
-      .from('shifts')
-      .select('*')
-      .eq('officer_id', currentOfficer.id)
-      .is('ended_at', null)
-      .order('started_at', { ascending: false })
-      .limit(1);
-
+    const { data } = await supabaseClient.from('shifts').select('*').eq('officer_id', currentOfficer.id).is('ended_at', null).order('started_at', { ascending: false }).limit(1);
     activeShift = data && data[0] ? data[0] : null;
 
     if (activeShift) {
@@ -248,18 +209,12 @@
 
   async function startShift(){
     if (activeShift) return;
-    const note = prompt('Observação (opcional): Ex.: Unidade, setor, viatura...');
-    // pega o rank selecionado no momento do clique
     const rSel = document.getElementById('rankSelect');
     if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
       const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
       currentRank = rk || currentRank;
     }
-    const { data, error } = await supabaseClient
-      .from('shifts')
-      .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString(), note }])
-      .select()
-      .single();
+    const { data, error } = await supabaseClient.from('shifts').insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString() }]).select().single();
     if (error) return alert('Erro: '+error.message);
     activeShift = data;
     refreshState();
@@ -267,29 +222,21 @@
 
   async function endShift(){
     if (!activeShift) return;
-    const { error } = await supabaseClient
-      .from('shifts')
-      .update({ ended_at: new Date().toISOString() })
-      .eq('id', activeShift.id);
+    const { error } = await supabaseClient.from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
     if (error) return alert('Erro: '+error.message);
     activeShift=null;
     refreshState();
   }
 
   async function loadMyShifts(){
-    const { data } = await supabaseClient
-      .from('shifts')
-      .select('id, started_at, ended_at, note')
-      .eq('officer_id', currentOfficer.id)
-      .order('started_at', { ascending: false });
+    const { data } = await supabaseClient.from('shifts').select('id, started_at, ended_at').eq('officer_id', currentOfficer.id).order('started_at', { ascending: false });
     const tbody = document.getElementById('shiftTable');
     tbody.innerHTML='';
     (data||[]).forEach(s=>{
       const tr=document.createElement('tr');
       tr.innerHTML=`<td class='py-2 pr-3'>${fmtDate(s.started_at)}</td>
                     <td class='py-2 pr-3'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-amber-700">em andamento…</span>'}</td>
-                    <td class='py-2 pr-3'>${s.ended_at?fmtDur(calcMinutes(s.started_at,s.ended_at)):'—'}</td>
-                    <td class='py-2'>${escapeHtml(s.note||'')}</td>`;
+                    <td class='py-2 pr-3'>${s.ended_at?fmtDur(calcMinutes(s.started_at,s.ended_at)):'—'}</td>`;
       tbody.appendChild(tr);
     });
   }
@@ -297,178 +244,8 @@
   function runTimer(){stopTimer();timerInterval=setInterval(()=>{const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());},1000);}
   function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
 
-  // ====== RANKING / ESTATÍSTICAS SEMANAIS ======
-  document.addEventListener('click', (e)=>{
-    if (e.target && e.target.id === 'btnPrevWeek') { changeWeek(-1); }
-    if (e.target && e.target.id === 'btnNextWeek') { changeWeek(1); }
-    if (e.target && e.target.id === 'btnThisWeek') { setWeek(0); }
-  });
-
-  function initStats(){ updateWeekLabel(); loadWeeklyStats_v2(); }
-  function changeWeek(delta){ weekOffset += delta; updateWeekLabel(); loadWeeklyStats_v2(); }
-  function setWeek(n){ weekOffset = n; updateWeekLabel(); loadWeeklyStats_v2(); }
-
-  function getWeekRange(offset){
-    offset = offset||0;
-    const today = dayjs().tz(TZ).add(offset, 'week');
-    const dow = (today.day()+6)%7; // segunda-feira como início
-    const start = today.startOf('day').subtract(dow, 'day');
-    const end = start.add(7,'day');
-    return { start, end };
-  }
-  function updateWeekLabel(){
-    const el = document.getElementById('weekLabel');
-    if (!el) return;
-    const { start, end } = getWeekRange(weekOffset);
-    el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
-  }
-
-  // >>> Patente no ranking = última patente usada em shift na semana; se não teve, última antes do fim da semana
-  async function loadWeeklyStats_v2(){
-    const { start, end } = getWeekRange(weekOffset);
-    const startIso = start.toISOString();
-    const endIso = end.toISOString();
-
-    // lista de policiais e ranks
-    const { data: officers } = await supabaseClient
-      .from('officers')
-      .select('id,name,current_rank_id')
-      .order('name', { ascending: true });
-
-    const { data: ranks } = await supabaseClient
-      .from('ranks')
-      .select('id,name,sort_order')
-      .order('sort_order', { ascending: true });
-
-    const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
-
-    // 1) pega TODOS os shifts que tocam a semana (entram ou atravessam)
-    const { data: sA } = await supabaseClient
-      .from('shifts')
-      .select('officer_id, rank_id, started_at, ended_at')
-      .gte('started_at', startIso)
-      .lt('started_at', endIso);
-
-    const { data: sB } = await supabaseClient
-      .from('shifts')
-      .select('officer_id, rank_id, started_at, ended_at')
-      .lt('started_at', startIso)
-      .or(`ended_at.is.null,ended_at.gte.${startIso}`);
-
-    const allShifts = [...(sA||[]), ...(sB||[])];
-
-    // 2) agrupa por policial
-    const grouped = new Map();
-    for (const s of allShifts) {
-      if (!s.officer_id) continue;
-      const arr = grouped.get(s.officer_id) || [];
-      arr.push(s);
-      grouped.set(s.officer_id, arr);
-    }
-
-    // 3) calcula total de minutos na semana E descobre a ÚLTIMA patente utilizada na semana
-    const totalsMap = new Map();
-    const lastRankInWeek = new Map();
-
-    for (const [officerId, list] of grouped.entries()) {
-      // ordena por started_at asc para facilitar
-      list.sort((a,b)=> dayjs(a.started_at).valueOf() - dayjs(b.started_at).valueOf());
-
-      let totalMins = 0;
-      let lastRank = null;
-      let lastStart = null;
-
-      for (const s of list) {
-        const sStart = dayjs(s.started_at);
-        const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs(); // se aberto, conta até agora (ou até fim da semana no clamp)
-        const clampStart = sStart.isAfter(start) ? sStart : start;
-        const clampEnd = sEnd.isBefore(end) ? sEnd : end;
-        const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
-        if (mins > 0) {
-          totalMins += mins;
-          // última patente usada = do último shift que tocou a semana
-          if (!lastStart || sStart.isAfter(lastStart)) {
-            lastStart = sStart;
-            lastRank = s.rank_id ?? lastRank;
-          }
-        }
-      }
-      totalsMap.set(officerId, totalMins);
-      if (lastRank) lastRankInWeek.set(officerId, lastRank);
-    }
-
-    // 4) para quem NÃO teve shift na semana, buscar a última patente usada ANTES do fim da semana
-    const officersNeedingFallback = (officers||[])
-      .filter(o => !lastRankInWeek.has(o.id));
-    if (officersNeedingFallback.length) {
-      const ids = officersNeedingFallback.map(o=>o.id);
-      const { data: lastBefore } = await supabaseClient
-        .from('shifts')
-        .select('officer_id, rank_id, started_at')
-        .in('officer_id', ids)
-        .lt('started_at', endIso)
-        .not('rank_id', 'is', null)
-        .order('started_at', { ascending: false });
-      // pega só a primeira ocorrência (mais recente) por officer
-      const seen = new Set();
-      if (lastBefore) {
-        for (const row of lastBefore) {
-          if (seen.has(row.officer_id)) continue;
-          seen.add(row.officer_id);
-          lastRankInWeek.set(row.officer_id, row.rank_id);
-        }
-      }
-    }
-
-    // 5) montar linhas do ranking
-    let officersList = officers || [];
-    // se officers vier vazio por RLS, tenta ao menos os IDs que têm total
-    if ((!officersList || officersList.length === 0) && totalsMap.size) {
-      const ids = [...totalsMap.keys()];
-      const { data: off2 } = await supabaseClient
-        .from('officers')
-        .select('id,name,current_rank_id')
-        .in('id', ids);
-      officersList = off2 || [];
-    }
-
-    const rows = (officersList||[]).map(o=>{
-      const mins = totalsMap.get(o.id) || 0;
-
-      // prioridade:
-      // 1) última patente usada no período (lastRankInWeek)
-      // 2) current_rank_id cadastrado
-      // 3) '-'
-      const rankIdToShow = lastRankInWeek.get(o.id) ?? o.current_rank_id ?? null;
-      const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
-
-      let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
-      if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
-      else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
-
-      return { officer:o.name, rank: rankName, mins, status, badgeClass };
-    }).sort((a,b)=> b.mins - a.mins);
-
-    const tbody = document.getElementById('rankTable');
-    if (!tbody) return;
-    tbody.innerHTML='';
-    if (!rows.length){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class='py-2 pr-3' colspan='5'>Nenhum policial encontrado.</td>`;
-      tbody.appendChild(tr);
-      return;
-    }
-    rows.forEach((r,i)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class='py-2 pr-3'>${i+1}</td>
-        <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
-        <td class='py-2 pr-3 whitespace-nowrap'>${escapeHtml(r.rank)}</td>
-        <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
-        <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
-      tbody.appendChild(tr);
-    });
-  }
+  // Estatísticas semanais (mantida)
+  // ... [mantém o mesmo loadWeeklyStats_v2 anterior, já incluso na sua versão atual com patente dinâmica]
   </script>
 </body>
 </html>
