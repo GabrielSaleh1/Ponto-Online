@@ -229,10 +229,10 @@
 
   function initStats(){
     updateWeekLabel();
-    loadWeeklyStats();
+    loadWeeklyStats_v2();
   }
-  function changeWeek(delta){ weekOffset += delta; updateWeekLabel(); loadWeeklyStats(); }
-  function setWeek(n){ weekOffset = n; updateWeekLabel(); loadWeeklyStats(); }
+  function changeWeek(delta){ weekOffset += delta; updateWeekLabel(); loadWeeklyStats_v2(); }
+  function setWeek(n){ weekOffset = n; updateWeekLabel(); loadWeeklyStats_v2(); }
 
   function getWeekRange(offset){
     offset = offset||0;
@@ -316,7 +316,92 @@
       tbody.appendChild(tr);
     });
   }
+  // --- NOVA VERSÃO do carregamento de estatísticas (mais robusta)
+  async function loadWeeklyStats_v2(){
+    const { start, end } = getWeekRange(weekOffset);
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
+
+    // Oficiais e patentes
+    const { data: officers } = await supabaseClient
+      .from('officers')
+      .select('id,name,current_rank_id')
+      .order('name', { ascending: true });
+
+    const { data: ranks } = await supabaseClient
+      .from('ranks')
+      .select('id,name,sort_order')
+      .order('sort_order', { ascending: true });
+
+    const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
+
+    // Tenta função SQL (se existir)
+    let totals = [];
+    try {
+      const rpc = await supabaseClient.rpc('weekly_minutes', { p_start: startIso, p_end: endIso });
+      if (!rpc.error && rpc.data) totals = rpc.data;
+    } catch(_) {}
+
+    if (!totals || totals.length === 0){
+      // Fallback: duas consultas e união
+      const { data: sA } = await supabaseClient
+        .from('shifts')
+        .select('officer_id, started_at, ended_at')
+        .gte('started_at', startIso)
+        .lt('started_at', endIso);
+
+      const { data: sB } = await supabaseClient
+        .from('shifts')
+        .select('officer_id, started_at, ended_at')
+        .lt('started_at', startIso)
+        .or(`ended_at.is.null,ended_at.gte.${startIso}`);
+
+      const totalByOfficer = new Map();
+      [...(sA||[]), ...(sB||[])].forEach(s=>{
+        if (!s.officer_id) return;
+        const sStart = dayjs(s.started_at);
+        const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs();
+        const clampStart = sStart.isAfter(start) ? sStart : start;
+        const clampEnd = sEnd.isBefore(end) ? sEnd : end;
+        const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
+        if (mins>0) totalByOfficer.set(s.officer_id, (totalByOfficer.get(s.officer_id)||0) + mins);
+      });
+      totals = [...totalByOfficer.entries()].map(([officer_id, minutes]) => ({ officer_id, minutes }));
+    }
+
+    const totalsMap = new Map();
+    (totals||[]).forEach(t=> totalsMap.set(t.officer_id, t.minutes||0));
+
+    // Monta linhas
+    const rows = (officers||[]).map(o=>{
+      const mins = totalsMap.get(o.id)||0;
+      let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
+      if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
+      else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
+      return { officer:o.name, rank: rankMap[String(o.current_rank_id)]||'-', mins, status, badgeClass };
+    }).sort((a,b)=> b.mins - a.mins);
+
+    const tbody = document.getElementById('rankTable');
+    if (!tbody) return;
+    tbody.innerHTML='';
+    if (!rows.length){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class='py-2 pr-3' colspan='5'>Nenhum policial encontrado.</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    rows.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class='py-2 pr-3'>${i+1}</td>
+        <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
+        <td class='py-2 pr-3'>${escapeHtml(r.rank)}</td>
+        <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
+        <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
   </script>
 </body>
 </html>
-
