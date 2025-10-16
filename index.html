@@ -140,8 +140,12 @@
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
 
-    const { data: officers } = await supabaseClient.from('officers').select('id,name,current_rank_id,active').eq('active', true).order('name', { ascending: true });
-    const { data: ranks } = await supabaseClient.from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+    const { data: officers, error: offErr } = await supabaseClient
+      .from('officers').select('id,name,current_rank_id,active').eq('active', true).order('name', { ascending: true });
+    const { data: ranks } = await supabaseClient
+      .from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+
+    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; return; }
 
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
@@ -157,10 +161,11 @@
 
   async function setDefaultRankForOfficer(officerId) {
     const rSel = document.getElementById('rankSelect');
-    const { data: lastShift } = await supabaseClient.from('shifts').select('rank_id').eq('officer_id', officerId).not('rank_id', 'is', null).order('started_at', { ascending: false }).limit(1);
+    const { data: lastShift } = await supabaseClient
+      .from('shifts').select('rank_id').eq('officer_id', officerId)
+      .not('rank_id', 'is', null).order('started_at', { ascending: false }).limit(1);
     if (lastShift && lastShift.length && lastShift[0].rank_id) {
-      rSel.value = String(lastShift[0].rank_id);
-      return;
+      rSel.value = String(lastShift[0].rank_id); return;
     }
     const oSel = document.getElementById('officerSelect');
     const opt = oSel.options[oSel.selectedIndex];
@@ -189,7 +194,13 @@
   }
 
   async function refreshState(){
-    const { data } = await supabaseClient.from('shifts').select('*').eq('officer_id', currentOfficer.id).is('ended_at', null).order('started_at', { ascending: false }).limit(1);
+    const { data } = await supabaseClient
+      .from('shifts').select('*')
+      .eq('officer_id', currentOfficer.id)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1);
+
     activeShift = data && data[0] ? data[0] : null;
 
     if (activeShift) {
@@ -214,7 +225,10 @@
       const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
       currentRank = rk || currentRank;
     }
-    const { data, error } = await supabaseClient.from('shifts').insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString() }]).select().single();
+    const { data, error } = await supabaseClient
+      .from('shifts')
+      .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString() }])
+      .select().single();
     if (error) return alert('Erro: '+error.message);
     activeShift = data;
     refreshState();
@@ -222,14 +236,18 @@
 
   async function endShift(){
     if (!activeShift) return;
-    const { error } = await supabaseClient.from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
+    const { error } = await supabaseClient
+      .from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
     if (error) return alert('Erro: '+error.message);
     activeShift=null;
     refreshState();
   }
 
   async function loadMyShifts(){
-    const { data } = await supabaseClient.from('shifts').select('id, started_at, ended_at').eq('officer_id', currentOfficer.id).order('started_at', { ascending: false });
+    const { data } = await supabaseClient
+      .from('shifts').select('id, started_at, ended_at')
+      .eq('officer_id', currentOfficer.id)
+      .order('started_at', { ascending: false });
     const tbody = document.getElementById('shiftTable');
     tbody.innerHTML='';
     (data||[]).forEach(s=>{
@@ -244,8 +262,151 @@
   function runTimer(){stopTimer();timerInterval=setInterval(()=>{const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());},1000);}
   function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
 
-  // Estatísticas semanais (mantida)
-  // ... [mantém o mesmo loadWeeklyStats_v2 anterior, já incluso na sua versão atual com patente dinâmica]
+  // ====== Estatísticas semanais ======
+  document.addEventListener('click', (e)=>{
+    if (e.target && e.target.id === 'btnPrevWeek') { changeWeek(-1); }
+    if (e.target && e.target.id === 'btnNextWeek') { changeWeek(1); }
+    if (e.target && e.target.id === 'btnThisWeek') { setWeek(0); }
+  });
+
+  function initStats(){ updateWeekLabel(); loadWeeklyStats_v2(); }
+  function changeWeek(delta){ weekOffset += delta; updateWeekLabel(); loadWeeklyStats_v2(); }
+  function setWeek(n){ weekOffset = n; updateWeekLabel(); loadWeeklyStats_v2(); }
+
+  function getWeekRange(offset){
+    offset = offset||0;
+    const today = dayjs().tz(TZ).add(offset, 'week');
+    const dow = (today.day()+6)%7; // segunda-feira como início
+    const start = today.startOf('day').subtract(dow, 'day');
+    const end = start.add(7,'day');
+    return { start, end };
+  }
+  function updateWeekLabel(){
+    const el = document.getElementById('weekLabel');
+    if (!el) return;
+    const { start, end } = getWeekRange(weekOffset);
+    el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
+  }
+
+  // >>> Patente no ranking = última patente usada em shift na semana; se não teve, última antes do fim da semana
+  async function loadWeeklyStats_v2(){
+    const { start, end } = getWeekRange(weekOffset);
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
+
+    // lista de policiais e ranks
+    const { data: officers } = await supabaseClient
+      .from('officers').select('id,name,current_rank_id').order('name', { ascending: true });
+    const { data: ranks } = await supabaseClient
+      .from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+
+    const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
+
+    // shifts que tocam a semana
+    const { data: sA } = await supabaseClient
+      .from('shifts').select('officer_id, rank_id, started_at, ended_at')
+      .gte('started_at', startIso).lt('started_at', endIso);
+    const { data: sB } = await supabaseClient
+      .from('shifts').select('officer_id, rank_id, started_at, ended_at')
+      .lt('started_at', startIso).or(`ended_at.is.null,ended_at.gte.${startIso}`);
+    const allShifts = [...(sA||[]), ...(sB||[])];
+
+    // agrupa
+    const grouped = new Map();
+    for (const s of allShifts) {
+      if (!s.officer_id) continue;
+      const arr = grouped.get(s.officer_id) || [];
+      arr.push(s);
+      grouped.set(s.officer_id, arr);
+    }
+
+    // totais e última patente usada na semana
+    const totalsMap = new Map();
+    const lastRankInWeek = new Map();
+
+    for (const [officerId, list] of grouped.entries()) {
+      list.sort((a,b)=> dayjs(a.started_at).valueOf() - dayjs(b.started_at).valueOf());
+      let totalMins = 0;
+      let lastRank = null;
+      let lastStart = null;
+
+      for (const s of list) {
+        const sStart = dayjs(s.started_at);
+        const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs();
+        const clampStart = sStart.isAfter(start) ? sStart : start;
+        const clampEnd = sEnd.isBefore(end) ? sEnd : end;
+        const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
+        if (mins > 0) {
+          totalMins += mins;
+          if (!lastStart || sStart.isAfter(lastStart)) {
+            lastStart = sStart;
+            lastRank = s.rank_id ?? lastRank;
+          }
+        }
+      }
+      totalsMap.set(officerId, totalMins);
+      if (lastRank) lastRankInWeek.set(officerId, lastRank);
+    }
+
+    // para quem não teve shift na semana: última patente antes do fim da semana
+    const needFallback = (officers||[]).filter(o => !lastRankInWeek.has(o.id));
+    if (needFallback.length) {
+      const ids = needFallback.map(o=>o.id);
+      const { data: lastBefore } = await supabaseClient
+        .from('shifts').select('officer_id, rank_id, started_at')
+        .in('officer_id', ids).lt('started_at', endIso)
+        .not('rank_id', 'is', null).order('started_at', { ascending: false });
+      const seen = new Set();
+      if (lastBefore) {
+        for (const row of lastBefore) {
+          if (seen.has(row.officer_id)) continue;
+          seen.add(row.officer_id);
+          lastRankInWeek.set(row.officer_id, row.rank_id);
+        }
+      }
+    }
+
+    // se officers vier vazio por RLS, tenta ao menos os IDs que têm total
+    let officersList = officers || [];
+    if ((!officersList || officersList.length === 0) && totalsMap.size) {
+      const ids = [...totalsMap.keys()];
+      const { data: off2 } = await supabaseClient
+        .from('officers').select('id,name,current_rank_id').in('id', ids);
+      officersList = off2 || [];
+    }
+
+    const rows = (officersList||[]).map(o=>{
+      const mins = totalsMap.get(o.id) || 0;
+      const rankIdToShow = lastRankInWeek.get(o.id) ?? o.current_rank_id ?? null;
+      const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
+
+      let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
+      if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
+      else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
+
+      return { officer:o.name, rank: rankName, mins, status, badgeClass };
+    }).sort((a,b)=> b.mins - a.mins);
+
+    const tbody = document.getElementById('rankTable');
+    if (!tbody) return;
+    tbody.innerHTML='';
+    if (!rows.length){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class='py-2 pr-3' colspan='5'>Nenhum policial encontrado.</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    rows.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class='py-2 pr-3'>${i+1}</td>
+        <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
+        <td class='py-2 pr-3 whitespace-nowrap'>${escapeHtml(r.rank)}</td>
+        <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
+        <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
+      tbody.appendChild(tr);
+    });
+  }
   </script>
 </body>
 </html>
