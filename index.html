@@ -16,7 +16,7 @@
   <div class="max-w-4xl mx-auto p-6">
     <h1 class="text-3xl font-bold mb-6">Bate Ponto Online</h1>
 
-    <!-- Identificação por Oficial + Patente (sem crachá) -->
+    <!-- Identificação -->
     <section id="loginSection" class="mb-6">
       <h2 class="text-xl font-semibold mb-3">Identificação</h2>
       <div class="grid sm:grid-cols-3 gap-3 items-end">
@@ -37,83 +37,91 @@
     </section>
 
     <div id="contentGrid" class="grid md:grid-cols-2 gap-6 items-start">
-    <!-- Painel principal -->
-    <section id="mainSection" class="hidden">
-      <div class="rounded-2xl shadow p-5 mb-6 bg-white">
-        <h2 class="text-2xl font-semibold mb-2">Status</h2>
-        <p id="whoText" class="text-slate-600 text-sm mb-1">—</p>
-        <p id="statusText" class="text-slate-700">Fora de patrulha</p>
-        <p id="runningTimer" class="text-3xl font-bold mt-2">00:00:00</p>
-        <div class="mt-4 flex gap-3">
-          <button id="btnStart" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">Iniciar patrulha</button>
-          <button id="btnStop"  class="px-4 py-2 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 hidden">Encerrar</button>
+      <!-- Painel principal -->
+      <section id="mainSection" class="hidden">
+        <div class="rounded-2xl shadow p-5 mb-6 bg-white">
+          <h2 class="text-2xl font-semibold mb-2">Status</h2>
+          <p id="whoText" class="text-slate-600 text-sm mb-1">—</p>
+          <p id="statusText" class="text-slate-700">Fora de patrulha</p>
+          <p id="runningTimer" class="text-3xl font-bold mt-2">00:00:00</p>
+          <div class="mt-4 flex gap-3">
+            <button id="btnStart" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">Iniciar patrulha</button>
+            <button id="btnStop"  class="px-4 py-2 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 hidden">Encerrar</button>
+          </div>
         </div>
-      </div>
-      <div class="rounded-2xl shadow p-5 bg-white">
-        <h3 class="text-lg font-semibold mb-4">Patrulhamentos registrados</h3>
+        <div class="rounded-2xl shadow p-5 bg-white">
+          <h3 class="text-lg font-semibold mb-4">Patrulhamentos registrados</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-600 border-b">
+                  <th class="py-2">Início</th>
+                  <th class="py-2">Término</th>
+                  <th class="py-2">Duração</th>
+                  <th class="py-2">Observações</th>
+                </tr>
+              </thead>
+              <tbody id="shiftTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Estatísticas e Ranking -->
+      <section id="statsSection" class="hidden md:sticky md:top-4 rounded-2xl shadow p-5 bg-white">
+        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h3 class="text-lg font-semibold">Estatísticas da semana</h3>
+          <div class="flex items-center gap-3 text-sm text-slate-600">
+            <div class="px-2 py-1 rounded bg-slate-100">Meta: <strong>10h</strong></div>
+            <div class="px-2 py-1 rounded bg-yellow-100">Iminência leve: &gt; 7h e &lt; 10h</div>
+            <div class="px-2 py-1 rounded bg-rose-100">Iminência alta: &lt; 7h</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 mb-3 text-sm">
+          <button id="btnPrevWeek" class="px-3 py-1.5 rounded border">◀ Semana anterior</button>
+          <div id="weekLabel" class="font-medium"></div>
+          <button id="btnNextWeek" class="px-3 py-1.5 rounded border">Semana seguinte ▶</button>
+          <button id="btnThisWeek" class="ml-auto px-3 py-1.5 rounded border">Esta semana</button>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-slate-600 border-b">
-                <th class="py-2">Início</th>
-                <th class="py-2">Término</th>
-                <th class="py-2">Duração</th>
-                <th class="py-2">Observações</th>
+                <th class="py-2">#</th>
+                <th class="py-2">Policial</th>
+                <th class="py-2">Patente</th>
+                <th class="py-2">Total</th>
+                <th class="py-2">Status</th>
               </tr>
             </thead>
-            <tbody id="shiftTable"></tbody>
+            <tbody id="rankTable"></tbody>
           </table>
         </div>
-      </div>
-    </section>
-
-    <!-- Estatísticas e Ranking -->
-    <section id="statsSection" class="hidden md:sticky md:top-4 rounded-2xl shadow p-5 bg-white">
-      <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <h3 class="text-lg font-semibold">Estatísticas da semana</h3>
-        <div class="flex items-center gap-3 text-sm text-slate-600">
-          <div class="px-2 py-1 rounded bg-slate-100">Meta: <strong>10h</strong></div>
-          <div class="px-2 py-1 rounded bg-yellow-100">Iminência leve: &gt; 7h e &lt; 10h</div>
-          <div class="px-2 py-1 rounded bg-rose-100">Iminência alta: &lt; 7h</div>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 mb-3 text-sm">
-        <button id="btnPrevWeek" class="px-3 py-1.5 rounded border">◀ Semana anterior</button>
-        <div id="weekLabel" class="font-medium"></div>
-        <button id="btnNextWeek" class="px-3 py-1.5 rounded border">Semana seguinte ▶</button>
-        <button id="btnThisWeek" class="ml-auto px-3 py-1.5 rounded border">Esta semana</button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-600 border-b">
-              <th class="py-2">#</th>
-              <th class="py-2">Policial</th>
-              <th class="py-2">Patente</th>
-              <th class="py-2">Total</th>
-              <th class="py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody id="rankTable"></tbody>
-        </table>
-      </div>
-    </section>
+      </section>
     </div><!-- /contentGrid -->
   </div>
 
   <script>
+  // ====== CONFIG ======
   const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
+  const META_MIN = 10*60;     // 10h em minutos
+  const LEVE_MIN = 7*60;      // 7h em minutos
+
+  // ====== STATE ======
   let supabaseClient, activeShift=null, timerInterval=null;
   let currentOfficer=null;
   let currentRank=null;
+  let weekOffset = 0;         // 0 = semana atual
 
+  // ====== BOOT ======
   document.addEventListener('DOMContentLoaded', async () => {
     dayjs.extend(window.dayjs_plugin_utc);
     dayjs.extend(window.dayjs_plugin_timezone);
     dayjs.extend(window.dayjs_plugin_duration);
     dayjs.tz.setDefault(TZ);
+
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     document.getElementById('enterBtn').addEventListener('click', enterApp);
@@ -124,6 +132,14 @@
     await loadLists();
   });
 
+  // ====== HELPERS ======
+  function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
+  function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
+  function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
+  function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
+  function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
+
+  // ====== LISTAS (POLICIAIS/PATENTES) ======
   async function loadLists(){
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
@@ -139,32 +155,59 @@
       .select('id,name,sort_order')
       .order('sort_order', { ascending: true });
 
-    if (offErr) {
-      loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message;
-      return;
-    }
+    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; return; }
 
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
+
     oSel.innerHTML = (officers||[]).map(o=>`<option value="${o.id}" data-rank="${o.current_rank_id||''}">${escapeHtml(o.name)}</option>`).join('');
     rSel.innerHTML = (ranks||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
-    if ((officers||[]).length){
-      const firstRank = officers[0].current_rank_id;
-      if (firstRank){ rSel.value = String(firstRank); }
-    }
     loginMsg.textContent = '';
-    oSel.addEventListener('change', ()=>{
-      const opt = oSel.options[oSel.selectedIndex];
-      const defRank = opt.getAttribute('data-rank');
-      if (defRank) rSel.value = defRank;
-    }, { once: true });
+
+    // quando mudar o policial, setar a patente do último ponto
+    oSel.addEventListener('change', () => { setDefaultRankForOfficer(oSel.value); });
+
+    // ao carregar a lista pela primeira vez, já setar para o policial selecionado
+    if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
   }
 
+  // **NOVO**: define a patente com base no último turno desse policial (fallback: current_rank_id; fallback2: primeira opção)
+  async function setDefaultRankForOfficer(officerId) {
+    const rSel = document.getElementById('rankSelect');
+
+    // 1) tenta pegar o último shift desse policial com rank_id setado
+    const { data: lastShift, error } = await supabaseClient
+      .from('shifts')
+      .select('rank_id')
+      .eq('officer_id', officerId)
+      .not('rank_id', 'is', null)
+      .order('started_at', { ascending: false })
+      .limit(1);
+
+    if (!error && lastShift && lastShift.length && lastShift[0].rank_id) {
+      rSel.value = String(lastShift[0].rank_id);
+      return;
+    }
+
+    // 2) fallback: usar current_rank_id do cadastro do officer
+    const oSel = document.getElementById('officerSelect');
+    const opt = oSel.options[oSel.selectedIndex];
+    const defRank = opt?.getAttribute('data-rank');
+    if (defRank) { rSel.value = String(defRank); return; }
+
+    // 3) último fallback: primeira opção
+    if (rSel.options.length) rSel.selectedIndex = 0;
+  }
+
+  // ====== ENTRAR NO APP ======
   async function enterApp(){
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
     if (!oSel.value) return alert('Selecione o policial.');
+
+    // garante que o rank esteja no último usado antes de continuar
+    await setDefaultRankForOfficer(oSel.value);
     if (!rSel.value) return alert('Selecione a patente.');
 
     const { data: officer } = await supabaseClient.from('officers').select('id,name').eq('id', oSel.value).single();
@@ -175,10 +218,12 @@
     document.getElementById('mainSection').classList.remove('hidden');
     document.getElementById('statsSection').classList.remove('hidden');
     document.getElementById('whoText').textContent = `${officer.name} • ${rank.name}`;
+
     refreshState();
     initStats();
   }
 
+  // ====== ESTADO DO PONTO ======
   async function refreshState(){
     const { data } = await supabaseClient
       .from('shifts')
@@ -208,6 +253,12 @@
   async function startShift(){
     if (activeShift) return;
     const note = prompt('Observação (opcional): Ex.: Unidade, setor, viatura...');
+    // **garante que currentRank esteja atualizado do select**
+    const rSel = document.getElementById('rankSelect');
+    if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
+      const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
+      currentRank = rk || currentRank;
+    }
     const { data, error } = await supabaseClient
       .from('shifts')
       .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString(), note }])
@@ -249,28 +300,15 @@
 
   function runTimer(){stopTimer();timerInterval=setInterval(()=>{const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());},1000);}
   function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
-  function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
-  function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
-  function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
-  function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
-  function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
 
   // ====== RANKING / ESTATÍSTICAS SEMANAIS ======
-  const META_MIN = 10*60;     // 10h em minutos
-  const LEVE_MIN = 7*60;      // 7h em minutos
-  let weekOffset = 0;         // 0 = semana atual
-
-  // Botões (existem após entrar no app)
   document.addEventListener('click', (e)=>{
     if (e.target && e.target.id === 'btnPrevWeek') { changeWeek(-1); }
     if (e.target && e.target.id === 'btnNextWeek') { changeWeek(1); }
     if (e.target && e.target.id === 'btnThisWeek') { setWeek(0); }
   });
 
-  function initStats(){
-    updateWeekLabel();
-    loadWeeklyStats_v2();
-  }
+  function initStats(){ updateWeekLabel(); loadWeeklyStats_v2(); }
   function changeWeek(delta){ weekOffset += delta; updateWeekLabel(); loadWeeklyStats_v2(); }
   function setWeek(n){ weekOffset = n; updateWeekLabel(); loadWeeklyStats_v2(); }
 
@@ -282,7 +320,6 @@
     const end = start.add(7,'day');
     return { start, end };
   }
-
   function updateWeekLabel(){
     const el = document.getElementById('weekLabel');
     if (!el) return;
@@ -290,13 +327,11 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
-  // --- versão robusta do ranking semanal
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    // 1) tenta carregar a lista de policiais/patentes
     const { data: officers } = await supabaseClient
       .from('officers')
       .select('id,name,current_rank_id')
@@ -309,14 +344,14 @@
 
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
-    // 2) tenta RPC (se existir)
+    // tenta RPC weekly_minutes, se existir
     let totals = [];
     try {
       const rpc = await supabaseClient.rpc('weekly_minutes', { p_start: startIso, p_end: endIso });
       if (!rpc.error && rpc.data) totals = rpc.data;
     } catch(_) {}
 
-    // 3) fallback sem RPC
+    // fallback sem RPC: soma minutos cortando os períodos na semana
     if (!totals || totals.length === 0){
       const { data: sA } = await supabaseClient
         .from('shifts')
@@ -346,8 +381,7 @@
     const totalsMap = new Map();
     (totals||[]).forEach(t=> totalsMap.set(t.officer_id, t.minutes||0));
 
-    // 4) **NOVIDADE**: se a lista completa de officers vier vazia (por RLS/esquema),
-    // buscarmos Apenas quem aparece nos totais para garantir que o nome apareça.
+    // se officers vier vazio por RLS, busca só os que aparecem nos totais
     let officersList = officers || [];
     if ((!officersList || officersList.length === 0) && totals && totals.length){
       const ids = totals.map(t=>t.officer_id).filter(Boolean);
@@ -360,7 +394,6 @@
       }
     }
 
-    // 5) monta linhas
     const rows = (officersList||[]).map(o=>{
       const mins = totalsMap.get(o.id)||0;
       let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
