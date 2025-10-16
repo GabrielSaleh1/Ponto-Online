@@ -13,7 +13,7 @@
   <style>.label{display:block;font-size:.875rem;color:#475569;margin-bottom:.25rem}</style>
 </head>
 <body class="bg-slate-100 text-slate-900">
-  <div class="max-w-4xl mx-auto p-6">
+  <div class="max-w-6xl mx-auto p-6">
     <h1 class="text-3xl font-bold mb-6">Bate Ponto Online</h1>
 
     <!-- Identificação -->
@@ -36,9 +36,10 @@
       <p id="loginMsg" class="text-sm text-slate-600 mt-2"></p>
     </section>
 
-    <div id="contentGrid" class="grid md:grid-cols-2 gap-6 items-start">
-      <!-- Painel principal -->
-      <section id="mainSection" class="hidden">
+    <!-- AQUI: stats ganhou mais espaço no desktop -->
+    <div id="contentGrid" class="grid gap-6 items-start lg:grid-cols-5">
+      <!-- Painel principal (2 colunas) -->
+      <section id="mainSection" class="hidden lg:col-span-2">
         <div class="rounded-2xl shadow p-5 mb-6 bg-white">
           <h2 class="text-2xl font-semibold mb-2">Status</h2>
           <p id="whoText" class="text-slate-600 text-sm mb-1">—</p>
@@ -67,10 +68,10 @@
         </div>
       </section>
 
-      <!-- Estatísticas e Ranking -->
-      <section id="statsSection" class="hidden md:sticky md:top-4 rounded-2xl shadow p-5 bg-white">
+      <!-- Estatísticas e Ranking (3 colunas) -->
+      <section id="statsSection" class="hidden lg:col-span-3 lg:sticky lg:top-4 rounded-2xl shadow p-5 bg-white">
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <h3 class="text-lg font-semibold">Estatísticas da semana</h3>
+          <h3 class="text-xl font-semibold">Estatísticas da semana</h3>
           <div class="flex items-center gap-3 text-sm text-slate-600">
             <div class="px-2 py-1 rounded bg-slate-100">Meta: <strong>10h</strong></div>
             <div class="px-2 py-1 rounded bg-yellow-100">Iminência leve: &gt; 7h e &lt; 10h</div>
@@ -84,7 +85,8 @@
           <button id="btnThisWeek" class="ml-auto px-3 py-1.5 rounded border">Esta semana</button>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <!-- AQUI: tipografia um pouco maior -->
+          <table class="w-full text-base">
             <thead>
               <tr class="text-left text-slate-600 border-b">
                 <th class="py-2">#</th>
@@ -172,7 +174,7 @@
     if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
   }
 
-  // **NOVO**: define a patente com base no último turno desse policial (fallback: current_rank_id; fallback2: primeira opção)
+  // Define a patente com base no último turno desse policial (fallback: current_rank_id; fallback2: primeira opção)
   async function setDefaultRankForOfficer(officerId) {
     const rSel = document.getElementById('rankSelect');
 
@@ -327,6 +329,7 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
+  // >>> PATENTE NA ESTATÍSTICA: última usada no período (ou última até o fim do período), com fallback para current_rank_id
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
@@ -344,14 +347,13 @@
 
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
-    // tenta RPC weekly_minutes, se existir
+    // Totais de minutos (RPC se existir; senão, fallback)
     let totals = [];
     try {
       const rpc = await supabaseClient.rpc('weekly_minutes', { p_start: startIso, p_end: endIso });
       if (!rpc.error && rpc.data) totals = rpc.data;
     } catch(_) {}
 
-    // fallback sem RPC: soma minutos cortando os períodos na semana
     if (!totals || totals.length === 0){
       const { data: sA } = await supabaseClient
         .from('shifts')
@@ -381,6 +383,24 @@
     const totalsMap = new Map();
     (totals||[]).forEach(t=> totalsMap.set(t.officer_id, t.minutes||0));
 
+    // Pega a ÚLTIMA patente usada pelo policial até o FIM da semana (prioriza turno dentro da semana)
+    // estratégia simples: buscar shifts com rank_id até endIso, ordenados desc, e pegar o primeiro por officer
+    const lastRankByOfficer = new Map();
+    const { data: lastRanksAll } = await supabaseClient
+      .from('shifts')
+      .select('officer_id, rank_id, started_at')
+      .lt('started_at', endIso)
+      .not('rank_id', 'is', null)
+      .order('started_at', { ascending: false });
+
+    if (lastRanksAll) {
+      for (const row of lastRanksAll) {
+        if (!lastRankByOfficer.has(row.officer_id)) {
+          lastRankByOfficer.set(row.officer_id, row.rank_id);
+        }
+      }
+    }
+
     // se officers vier vazio por RLS, busca só os que aparecem nos totais
     let officersList = officers || [];
     if ((!officersList || officersList.length === 0) && totals && totals.length){
@@ -396,10 +416,19 @@
 
     const rows = (officersList||[]).map(o=>{
       const mins = totalsMap.get(o.id)||0;
+
+      // PRIORIDADE DE EXIBIÇÃO DE PATENTE:
+      // 1) última utilizada (lastRankByOfficer) até o fim da semana
+      // 2) current_rank_id cadastrado no officer
+      // 3) '-'
+      const rankIdToShow = lastRankByOfficer.get(o.id) ?? o.current_rank_id ?? null;
+      const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
+
       let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
       if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
       else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
-      return { officer:o.name, rank: rankMap[String(o.current_rank_id)]||'-', mins, status, badgeClass };
+
+      return { officer:o.name, rank: rankName, mins, status, badgeClass };
     }).sort((a,b)=> b.mins - a.mins);
 
     const tbody = document.getElementById('rankTable');
@@ -416,7 +445,7 @@
       tr.innerHTML = `
         <td class='py-2 pr-3'>${i+1}</td>
         <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
-        <td class='py-2 pr-3'>${escapeHtml(r.rank)}</td>
+        <td class='py-2 pr-3 whitespace-nowrap'>${escapeHtml(r.rank)}</td>
         <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
         <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
       tbody.appendChild(tr);
