@@ -156,6 +156,7 @@
     document.getElementById('statsSection').classList.remove('hidden');
     document.getElementById('whoText').textContent = `${officer.name} • ${rank.name}`;
     refreshState();
+    initStats();
   }
 
   async function refreshState(){
