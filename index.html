@@ -128,17 +128,37 @@
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
 
-    const { data: officers } = await supabaseClient.from('officers').select('id,name,current_rank_id,active').eq('active', true).order('name', { ascending: true });
-    const { data: ranks } = await supabaseClient.from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+    const { data: officers, error: offErr } = await supabaseClient
+      .from('officers')
+      .select('id,name,current_rank_id,active')
+      .eq('active', true)
+      .order('name', { ascending: true });
+
+    const { data: ranks } = await supabaseClient
+      .from('ranks')
+      .select('id,name,sort_order')
+      .order('sort_order', { ascending: true });
+
+    if (offErr) {
+      loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message;
+      return;
+    }
 
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
-    oSel.innerHTML = officers.map(o=>`<option value="${o.id}" data-rank="${o.current_rank_id||''}">${o.name}</option>`).join('');
-    rSel.innerHTML = ranks.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+    oSel.innerHTML = (officers||[]).map(o=>`<option value="${o.id}" data-rank="${o.current_rank_id||''}">${escapeHtml(o.name)}</option>`).join('');
+    rSel.innerHTML = (ranks||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
-    if (officers.length){ const firstRank = officers[0].current_rank_id; if (firstRank){ rSel.value = String(firstRank); } }
+    if ((officers||[]).length){
+      const firstRank = officers[0].current_rank_id;
+      if (firstRank){ rSel.value = String(firstRank); }
+    }
     loginMsg.textContent = '';
-    oSel.addEventListener('change', ()=>{ const opt = oSel.options[oSel.selectedIndex]; const defRank = opt.getAttribute('data-rank'); if (defRank) rSel.value = defRank; }, { once: true });
+    oSel.addEventListener('change', ()=>{
+      const opt = oSel.options[oSel.selectedIndex];
+      const defRank = opt.getAttribute('data-rank');
+      if (defRank) rSel.value = defRank;
+    }, { once: true });
   }
 
   async function enterApp(){
@@ -160,7 +180,14 @@
   }
 
   async function refreshState(){
-    const { data } = await supabaseClient.from('shifts').select('*').eq('officer_id', currentOfficer.id).is('ended_at', null).order('started_at', { ascending: false }).limit(1);
+    const { data } = await supabaseClient
+      .from('shifts')
+      .select('*')
+      .eq('officer_id', currentOfficer.id)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1);
+
     activeShift = data && data[0] ? data[0] : null;
 
     if (activeShift) {
@@ -181,7 +208,11 @@
   async function startShift(){
     if (activeShift) return;
     const note = prompt('Observação (opcional): Ex.: Unidade, setor, viatura...');
-    const { data, error } = await supabaseClient.from('shifts').insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString(), note }]).select().single();
+    const { data, error } = await supabaseClient
+      .from('shifts')
+      .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString(), note }])
+      .select()
+      .single();
     if (error) return alert('Erro: '+error.message);
     activeShift = data;
     refreshState();
@@ -189,14 +220,21 @@
 
   async function endShift(){
     if (!activeShift) return;
-    const { error } = await supabaseClient.from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
+    const { error } = await supabaseClient
+      .from('shifts')
+      .update({ ended_at: new Date().toISOString() })
+      .eq('id', activeShift.id);
     if (error) return alert('Erro: '+error.message);
     activeShift=null;
     refreshState();
   }
 
   async function loadMyShifts(){
-    const { data } = await supabaseClient.from('shifts').select('id, started_at, ended_at, note').eq('officer_id', currentOfficer.id).order('started_at', { ascending: false });
+    const { data } = await supabaseClient
+      .from('shifts')
+      .select('id, started_at, ended_at, note')
+      .eq('officer_id', currentOfficer.id)
+      .order('started_at', { ascending: false });
     const tbody = document.getElementById('shiftTable');
     tbody.innerHTML='';
     (data||[]).forEach(s=>{
@@ -204,7 +242,7 @@
       tr.innerHTML=`<td class='py-2 pr-3'>${fmtDate(s.started_at)}</td>
                     <td class='py-2 pr-3'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-amber-700">em andamento…</span>'}</td>
                     <td class='py-2 pr-3'>${s.ended_at?fmtDur(calcMinutes(s.started_at,s.ended_at)):'—'}</td>
-                    <td class='py-2'>${s.note||''}</td>`;
+                    <td class='py-2'>${escapeHtml(s.note||'')}</td>`;
       tbody.appendChild(tr);
     });
   }
@@ -215,6 +253,8 @@
   function calcMinutes(a,b){return Math.floor(dayjs(b).diff(dayjs(a),'minute'))}
   function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
   function fmtDur(mins){const h=Math.floor(mins/60);const m=mins%60;return`${h}h${m}m`;}
+  function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
+
   // ====== RANKING / ESTATÍSTICAS SEMANAIS ======
   const META_MIN = 10*60;     // 10h em minutos
   const LEVE_MIN = 7*60;      // 7h em minutos
@@ -250,79 +290,13 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
-  async function loadWeeklyStats(){
-    const { start, end } = getWeekRange(weekOffset);
-
-    const { data: officers } = await supabaseClient
-      .from('officers')
-      .select('id,name,current_rank_id,active')
-      .order('name', { ascending: true });
-
-    const { data: ranks } = await supabaseClient
-      .from('ranks')
-      .select('id,name,sort_order')
-      .order('sort_order', { ascending: true });
-
-    const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
-
-    const endIso = end.toISOString();
-    const startIso = start.toISOString();
-
-    // Q1: turnos que COMEÇARAM dentro da semana
-    const { data: sA } = await supabaseClient
-      .from('shifts')
-      .select('officer_id, started_at, ended_at')
-      .gte('started_at', startIso)
-      .lt('started_at', endIso);
-
-    // Q2: turnos que começaram ANTES da semana e ainda estavam ativos ao menos no início da semana
-    const { data: sB } = await supabaseClient
-      .from('shifts')
-      .select('officer_id, started_at, ended_at')
-      .lt('started_at', startIso)
-      .or(`ended_at.is.null,ended_at.gte.${startIso}`);
-
-    const shifts1 = [...(sA||[]), ...(sB||[])];
-
-    const totalByOfficer = new Map();
-    (shifts1||[]).forEach(s=>{
-      const sStart = dayjs(s.started_at);
-      const sEnd = s.ended_at ? dayjs(s.ended_at) : dayjs();
-      const clampStart = sStart.isAfter(start) ? sStart : start;
-      const clampEnd = sEnd.isBefore(end) ? sEnd : end;
-      const mins = Math.max(0, Math.floor(clampEnd.diff(clampStart,'minute')));
-      if (mins>0){ totalByOfficer.set(s.officer_id, (totalByOfficer.get(s.officer_id)||0)+mins); }
-    });
-
-    const rows = (officers||[]).map(o=>{
-      const mins = totalByOfficer.get(o.id)||0;
-      let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
-      if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
-      else if (mins < META_MIN){ status='Iminência Leve'; badgeClass='bg-yellow-100 text-yellow-800'; }
-      return { officer:o.name, rank: rankMap[String(o.current_rank_id)]||'-', mins, status, badgeClass };
-    }).sort((a,b)=> b.mins - a.mins);
-
-    const tbody = document.getElementById('rankTable');
-    if (!tbody) return;
-    tbody.innerHTML='';
-    rows.forEach((r,i)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class='py-2 pr-3'>${i+1}</td>
-        <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
-        <td class='py-2 pr-3'>${escapeHtml(r.rank)}</td>
-        <td class='py-2 pr-3'>${fmtDur(r.mins)}</td>
-        <td class='py-2 pr-3'><span class='px-2 py-1 rounded ${r.badgeClass}'>${r.status}</span></td>`;
-      tbody.appendChild(tr);
-    });
-  }
-  // --- NOVA VERSÃO do carregamento de estatísticas (mais robusta)
+  // --- versão robusta do ranking semanal
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    // Oficiais e patentes
+    // 1) tenta carregar a lista de policiais/patentes
     const { data: officers } = await supabaseClient
       .from('officers')
       .select('id,name,current_rank_id')
@@ -335,15 +309,15 @@
 
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
-    // Tenta função SQL (se existir)
+    // 2) tenta RPC (se existir)
     let totals = [];
     try {
       const rpc = await supabaseClient.rpc('weekly_minutes', { p_start: startIso, p_end: endIso });
       if (!rpc.error && rpc.data) totals = rpc.data;
     } catch(_) {}
 
+    // 3) fallback sem RPC
     if (!totals || totals.length === 0){
-      // Fallback: duas consultas e união
       const { data: sA } = await supabaseClient
         .from('shifts')
         .select('officer_id, started_at, ended_at')
@@ -372,8 +346,22 @@
     const totalsMap = new Map();
     (totals||[]).forEach(t=> totalsMap.set(t.officer_id, t.minutes||0));
 
-    // Monta linhas
-    const rows = (officers||[]).map(o=>{
+    // 4) **NOVIDADE**: se a lista completa de officers vier vazia (por RLS/esquema),
+    // buscarmos Apenas quem aparece nos totais para garantir que o nome apareça.
+    let officersList = officers || [];
+    if ((!officersList || officersList.length === 0) && totals && totals.length){
+      const ids = totals.map(t=>t.officer_id).filter(Boolean);
+      if (ids.length){
+        const { data: off2 } = await supabaseClient
+          .from('officers')
+          .select('id,name,current_rank_id')
+          .in('id', ids);
+        officersList = off2 || [];
+      }
+    }
+
+    // 5) monta linhas
+    const rows = (officersList||[]).map(o=>{
       const mins = totalsMap.get(o.id)||0;
       let status = 'Frequência OK'; let badgeClass='bg-emerald-100 text-emerald-800';
       if (mins < LEVE_MIN){ status='Iminência Alta'; badgeClass='bg-rose-100 text-rose-800'; }
@@ -401,7 +389,6 @@
       tbody.appendChild(tr);
     });
   }
-
   </script>
 </body>
 </html>
