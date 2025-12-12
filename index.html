@@ -23,20 +23,17 @@
       --card:#111827;
       --card2:#0f172a;
       --stroke:rgba(148,163,184,.18);
-      --stroke2:rgba(245,158,11,.22);
       --gold:#f59e0b;
       --gold2:#fbbf24;
       --red:#ef4444;
       --green:#10b981;
       --text:#e5e7eb;
-      --muted:#94a3b8;
     }
     html,body{background:radial-gradient(1200px 900px at 15% 10%, rgba(245,158,11,.10), transparent 55%),
                           radial-gradient(1100px 800px at 85% 20%, rgba(239,68,68,.07), transparent 58%),
                           radial-gradient(900px 700px at 70% 95%, rgba(16,185,129,.06), transparent 55%),
                           linear-gradient(180deg, var(--bg0), var(--bg1));
               color:var(--text);}
-    /* subtle grid */
     body::before{
       content:""; position:fixed; inset:0; pointer-events:none; opacity:.30;
       background-image:
@@ -48,7 +45,7 @@
 
     .glass{
       background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border:1px solid var(--stroke);
+      border:1px solid rgba(148,163,184,.18);
       box-shadow: 0 20px 60px rgba(0,0,0,.45);
       backdrop-filter: blur(10px);
     }
@@ -59,7 +56,7 @@
     }
     .soft{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.10)), var(--card2);
-      border:1px solid var(--stroke);
+      border:1px solid rgba(148,163,184,.18);
     }
     .chip{ background: rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.28); }
     .mono{ font-variant-numeric: tabular-nums; }
@@ -113,6 +110,7 @@
 
 <body>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
     <!-- Top bar -->
     <header class="glass rounded-3xl p-5 sm:p-6 mb-6">
       <div class="flex items-center gap-4 flex-wrap">
@@ -130,13 +128,16 @@
           <span class="badge chip"><span class="opacity-80">Meta:</span> <b class="ml-1">10h/semana</b></span>
           <span class="badge chip"><span class="opacity-80">Fuso:</span> <b class="ml-1">America/Sao_Paulo</b></span>
           <span class="badge btn-outline" id="clockBadge" title="Hora local">--:--</span>
+          <button id="btnLogout" class="btn btn-outline hidden" type="button" title="Sair">
+            <span aria-hidden="true">🚪</span><span class="hidden sm:inline">Sair</span>
+          </button>
         </div>
       </div>
 
       <div class="mt-4 flex items-center gap-3 flex-wrap">
-        <div class="badge btn-outline" title="Dica: use 'Recarregar lista' se alguém novo não aparecer">
+        <div class="badge btn-outline">
           <span aria-hidden="true">🛡️</span>
-          <span class="text-slate-300/90">Registre início/fim • Sem duplicar patrulhas</span>
+          <span class="text-slate-300/90">Sistema protegido (login + RLS + anti-spam)</span>
         </div>
         <div class="ml-auto flex items-center gap-2">
           <button id="themeHint" class="btn btn-outline" type="button" title="Atalhos">
@@ -146,39 +147,42 @@
       </div>
     </header>
 
-    <!-- Login -->
-    <section id="loginSection" class="card rounded-3xl p-5 sm:p-6 mb-6">
+    <!-- LOGIN (Email/Senha) -->
+    <section id="loginAuth" class="card rounded-3xl p-5 sm:p-6 mb-6 max-w-xl mx-auto">
       <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
-          <h2 class="text-lg sm:text-xl font-semibold">Identificação</h2>
-          <p class="text-sm text-slate-300/75 mt-1">Selecione seu nome e patente para iniciar.</p>
+          <h2 class="text-lg sm:text-xl font-semibold">Login</h2>
+          <p class="text-sm text-slate-300/75 mt-1">Entre com seu email e senha para bater ponto.</p>
         </div>
         <div class="badge chip">
-          <span aria-hidden="true">ℹ️</span>
-          <span class="text-slate-200/90">Dados salvos no Supabase</span>
+          <span aria-hidden="true">🔒</span>
+          <span class="text-slate-200/90">Acesso individual</span>
         </div>
       </div>
 
-      <div class="grid sm:grid-cols-3 gap-3 items-end">
-        <div class="sm:col-span-2">
-          <label class="block text-sm text-slate-300/80 mb-1">Policial</label>
-          <select id="officerSelect" class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"></select>
+      <div class="grid gap-3">
+        <div>
+          <label class="block text-sm text-slate-300/80 mb-1">Email</label>
+          <input id="emailInput" type="email" autocomplete="email"
+            class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"
+            placeholder="seuemail@gmail.com" />
         </div>
 
         <div>
-          <label class="block text-sm text-slate-300/80 mb-1">Patente</label>
-          <select id="rankSelect" class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"></select>
+          <label class="block text-sm text-slate-300/80 mb-1">Senha</label>
+          <input id="passwordInput" type="password" autocomplete="current-password"
+            class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"
+            placeholder="••••••••" />
         </div>
-      </div>
 
-      <div class="mt-4 flex gap-3 flex-wrap">
-        <button id="enterBtn" class="btn btn-gold" type="button">
+        <button id="loginBtn" class="btn btn-gold mt-1" type="button">
           <span aria-hidden="true">➡️</span> Entrar
         </button>
-        <button id="reloadLists" class="btn btn-ghost" type="button">
-          <span aria-hidden="true">🔄</span> Recarregar lista
-        </button>
-        <span id="loginMsg" class="text-sm text-slate-300/80 self-center"></span>
+
+        <p id="loginError" class="hidden text-sm text-red-300"></p>
+        <p class="text-xs text-slate-300/70">
+          Se der erro “usuário não vinculado”, fale com o responsável para ligar seu usuário ao seu registro.
+        </p>
       </div>
     </section>
 
@@ -202,16 +206,23 @@
             <p id="runningTimer" class="text-4xl font-extrabold mt-1 mono text-amber-400">00:00:00</p>
           </div>
 
-          <div class="mt-4 flex gap-3 flex-wrap">
-            <button id="btnStart" class="btn btn-green" type="button">
-              <span aria-hidden="true">▶️</span> Iniciar patrulha
-            </button>
-            <button id="btnStop" class="btn btn-red hidden" type="button">
-              <span aria-hidden="true">⏹️</span> Encerrar
-            </button>
-            <button id="btnRefresh" class="btn btn-ghost" type="button" title="Atualizar estado">
-              <span aria-hidden="true">↻</span> Atualizar
-            </button>
+          <div class="mt-4 grid gap-3">
+            <div>
+              <label class="block text-sm text-slate-300/80 mb-1">Patente (para registrar o turno)</label>
+              <select id="rankSelect" class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"></select>
+            </div>
+
+            <div class="flex gap-3 flex-wrap">
+              <button id="btnStart" class="btn btn-green" type="button">
+                <span aria-hidden="true">▶️</span> Iniciar patrulha
+              </button>
+              <button id="btnStop" class="btn btn-red hidden" type="button">
+                <span aria-hidden="true">⏹️</span> Encerrar
+              </button>
+              <button id="btnRefresh" class="btn btn-ghost" type="button" title="Atualizar estado">
+                <span aria-hidden="true">↻</span> Atualizar
+              </button>
+            </div>
           </div>
 
           <p class="text-xs text-slate-300/70 mt-3">
@@ -249,7 +260,7 @@
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div>
             <h3 class="text-xl font-semibold">Estatísticas da semana</h3>
-            <p class="text-sm text-slate-300/75 mt-1">Ranking por tempo acumulado (seg → h/m/s).</p>
+            <p class="text-sm text-slate-300/75 mt-1">Ranking por tempo acumulado.</p>
           </div>
 
           <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-200/90">
@@ -303,12 +314,19 @@
   const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
-  const META_MIN = 10*60; // minutos
-  const LEVE_MIN = 7*60;  // minutos
 
-  let supabaseClient, activeShift=null, timerInterval=null;
-  let currentOfficer=null;
-  let currentRank=null;
+  // metas para o badge no ranking (em minutos)
+  const META_MIN = 10*60;
+  const LEVE_MIN = 7*60;
+
+  let supabaseClient;
+  let activeShift = null;
+  let timerInterval = null;
+
+  let currentUser = null;
+  let currentOfficer = null;
+  let currentRank = null;
+
   let weekOffset = 0;
 
   // === UI helpers ===
@@ -370,19 +388,22 @@
 
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    document.getElementById('enterBtn').addEventListener('click', enterApp);
-    document.getElementById('reloadLists').addEventListener('click', loadLists);
+    // UI events
+    document.getElementById('loginBtn').addEventListener('click', loginWithEmail);
+    document.getElementById('btnLogout').addEventListener('click', doLogout);
+
     document.getElementById('btnStart').addEventListener('click', startShift);
     document.getElementById('btnStop').addEventListener('click', endShift);
     document.getElementById('btnRefresh').addEventListener('click', () => refreshState(true));
     document.getElementById('themeHint').addEventListener('click', () => {
-      toast('Atalhos: Enter = Entrar • S = Iniciar • E = Encerrar • R = Atualizar', 'info');
+      toast('Atalhos: Enter = Login • S = Iniciar • E = Encerrar • R = Atualizar', 'info');
     });
 
     // keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (k === 'enter' && !document.getElementById('loginSection').classList.contains('hidden')) enterApp();
+      const loginVisible = !document.getElementById('loginAuth').classList.contains('hidden');
+      if (k === 'enter' && loginVisible) loginWithEmail();
       if (k === 's' && !document.getElementById('btnStart').classList.contains('hidden')) startShift();
       if (k === 'e' && !document.getElementById('btnStop').classList.contains('hidden')) endShift();
       if (k === 'r') refreshState(true);
@@ -391,107 +412,144 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    await loadLists();
+    // Se já tiver sessão, entra direto
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      await initAppAfterLogin();
+    }
   });
 
-  // ---------- Listas ----------
-  async function loadLists(){
-    const loginMsg = document.getElementById('loginMsg');
-    loginMsg.textContent = 'Carregando listas…';
+  async function loginWithEmail(){
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
 
-    const btn = document.getElementById('reloadLists');
+    const errEl = document.getElementById('loginError');
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+
+    if (!email || !password) {
+      errEl.textContent = 'Preencha email e senha.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    const btn = document.getElementById('loginBtn');
     setBusy(btn, true);
 
-    const { data: officers, error: offErr } = await supabaseClient
-      .from('officers').select('id,name,current_rank_id,active')
-      .eq('active', true).order('name', { ascending: true });
-
-    const { data: ranks, error: rkErr } = await supabaseClient
-      .from('ranks').select('id,name,sort_order')
-      .order('sort_order', { ascending: true });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
     setBusy(btn, false);
 
-    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; toast(offErr.message, 'err'); return; }
-    if (rkErr) { loginMsg.textContent = 'Erro ao carregar patentes: ' + rkErr.message; toast(rkErr.message, 'err'); return; }
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.classList.remove('hidden');
+      return;
+    }
 
-    const oSel = document.getElementById('officerSelect');
-    const rSel = document.getElementById('rankSelect');
-
-    oSel.innerHTML = (officers||[]).map(o=>`<option value="${o.id}" data-rank="${o.current_rank_id||''}">${escapeHtml(o.name)}</option>`).join('');
-    rSel.innerHTML = (ranks||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
-
-    loginMsg.textContent = '';
-    toast('Lista atualizada.', 'ok');
-
-    oSel.onchange = () => { setDefaultRankForOfficer(oSel.value); };
-    if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
+    currentUser = data?.user || null;
+    toast('Login realizado.', 'ok');
+    await initAppAfterLogin();
   }
 
-  async function setDefaultRankForOfficer(officerId) {
+  async function doLogout(){
+    await supabaseClient.auth.signOut();
+    toast('Você saiu.', 'info');
+    location.reload();
+  }
+
+  async function initAppAfterLogin(){
+    // carrega officer pelo user_id
+    const { data: officer, error: offErr } = await supabaseClient
+      .from('officers')
+      .select('id,name,current_rank_id,active')
+      .eq('user_id', currentUser.id)
+      .single();
+
+    if (offErr || !officer) {
+      document.getElementById('loginError').textContent =
+        'Seu usuário não está vinculado a um policial (officers.user_id). Fale com o responsável.';
+      document.getElementById('loginError').classList.remove('hidden');
+      toast('Usuário sem vínculo de officer.', 'err');
+      return;
+    }
+    if (officer.active === false) {
+      toast('Seu registro está inativo.', 'err');
+      return;
+    }
+
+    currentOfficer = officer;
+
+    // carrega ranks e define default
+    await loadRanks();
+    await setDefaultRank();
+
+    // mostra app
+    document.getElementById('loginAuth').classList.add('hidden');
+    document.getElementById('mainSection').classList.remove('hidden');
+    document.getElementById('statsSection').classList.remove('hidden');
+    document.getElementById('btnLogout').classList.remove('hidden');
+
+    updateWhoText();
+    await refreshState(true);
+
+    initStats();
+  }
+
+  function updateWhoText(){
+    const rName = currentRank?.name ? ` • ${currentRank.name}` : '';
+    document.getElementById('whoText').textContent = `${currentOfficer.name}${rName}`;
+  }
+
+  async function loadRanks(){
+    const { data: ranks, error } = await supabaseClient
+      .from('ranks').select('id,name,sort_order')
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      toast('Erro ao carregar patentes: ' + error.message, 'err');
+      return;
+    }
+
+    const rSel = document.getElementById('rankSelect');
+    rSel.innerHTML = (ranks||[]).map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+    rSel.onchange = async () => {
+      const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
+      currentRank = rk || currentRank;
+      updateWhoText();
+    };
+  }
+
+  async function setDefaultRank(){
     const rSel = document.getElementById('rankSelect');
 
-    // tenta última patente usada no último shift
+    // tenta última patente usada no último shift do próprio usuário
     const { data: lastShift } = await supabaseClient
       .from('shifts').select('rank_id')
-      .eq('officer_id', officerId)
+      .eq('user_id', currentUser.id)
       .not('rank_id', 'is', null)
       .order('started_at', { ascending: false }).limit(1);
 
     if (lastShift && lastShift.length && lastShift[0].rank_id) {
       rSel.value = String(lastShift[0].rank_id);
-      return;
+    } else if (currentOfficer.current_rank_id) {
+      rSel.value = String(currentOfficer.current_rank_id);
+    } else if (rSel.options.length) {
+      rSel.selectedIndex = 0;
     }
 
-    const oSel = document.getElementById('officerSelect');
-    const opt = oSel.options[oSel.selectedIndex];
-    const defRank = opt?.getAttribute('data-rank');
-    if (defRank) { rSel.value = String(defRank); return; }
-    if (rSel.options.length) rSel.selectedIndex = 0;
+    const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
+    currentRank = rk || currentRank;
+    updateWhoText();
   }
 
-  // ---------- Fluxo principal ----------
-  async function enterApp(){
-    const oSel = document.getElementById('officerSelect');
-    const rSel = document.getElementById('rankSelect');
-
-    if (!oSel.value) return toast('Selecione o policial.', 'warn');
-    if (!rSel.value) await setDefaultRankForOfficer(oSel.value);
-
-    const enterBtn = document.getElementById('enterBtn');
-    setBusy(enterBtn, true);
-
-    const { data: officer, error: offErr } = await supabaseClient
-      .from('officers').select('id,name').eq('id', oSel.value).single();
-
-    const { data: rank, error: rkErr } = await supabaseClient
-      .from('ranks').select('id,name').eq('id', rSel.value).single();
-
-    setBusy(enterBtn, false);
-
-    if (offErr) return toast('Erro: ' + offErr.message, 'err');
-    if (rkErr) return toast('Erro: ' + rkErr.message, 'err');
-
-    currentOfficer = officer;
-    currentRank = rank;
-
-    document.getElementById('loginSection').classList.add('hidden');
-    document.getElementById('mainSection').classList.remove('hidden');
-    document.getElementById('statsSection').classList.remove('hidden');
-
-    document.getElementById('whoText').textContent = `${officer.name} • ${rank.name}`;
-    toast(`Bem-vindo, ${officer.name}.`, 'ok');
-
-    await refreshState(true);
-    initStats();
-  }
-
+  // ---------- Estado / Turno ----------
   async function refreshState(showToast=false){
-    if(!currentOfficer) return;
+    if(!currentUser) return;
 
     const { data, error } = await supabaseClient
       .from('shifts').select('*')
-      .eq('officer_id', currentOfficer.id)
+      .eq('user_id', currentUser.id)
       .is('ended_at', null)
       .order('started_at', { ascending: false })
       .limit(1);
@@ -523,7 +581,7 @@
   }
 
   async function startShift(){
-    if (!currentOfficer) return;
+    if (!currentUser) return toast('Faça login.', 'warn');
     if (activeShift) return toast('Você já está em patrulha.', 'warn');
 
     const btn = document.getElementById('btnStart');
@@ -533,30 +591,40 @@
     if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
       const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
       currentRank = rk || currentRank;
+      updateWhoText();
     }
 
+    // IMPORTANTE:
+    // NÃO enviar officer_id nem user_id.
+    // O TRIGGER NO BANCO define e valida tudo.
     const { data, error } = await supabaseClient
       .from('shifts')
-      .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString() }])
+      .insert([{ rank_id: currentRank?.id ?? null }])
       .select().single();
 
     setBusy(btn, false);
 
     if (error) return toast('Erro: ' + error.message, 'err');
+
     activeShift = data;
     toast('Patrulha iniciada.', 'ok');
     refreshState(false);
+    loadWeeklyStats_v2();
   }
 
   async function endShift(){
-    if (!currentOfficer) return;
+    if (!currentUser) return toast('Faça login.', 'warn');
     if (!activeShift) return toast('Nenhuma patrulha em andamento.', 'warn');
 
     const btn = document.getElementById('btnStop');
     setBusy(btn, true);
 
+    // IMPORTANTE:
+    // Só atualiza ended_at (trigger vai forçar NOW e bloquear alterações indevidas)
     const { error } = await supabaseClient
-      .from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
+      .from('shifts')
+      .update({ ended_at: new Date().toISOString() }) // o trigger vai sobrescrever para now()
+      .eq('id', activeShift.id);
 
     setBusy(btn, false);
 
@@ -564,13 +632,13 @@
     toast('Patrulha encerrada.', 'ok');
     activeShift = null;
     refreshState(false);
-    loadWeeklyStats_v2(); // atualiza ranking
+    loadWeeklyStats_v2();
   }
 
   async function loadMyShifts(){
     const { data, error } = await supabaseClient
       .from('shifts').select('id, started_at, ended_at')
-      .eq('officer_id', currentOfficer.id)
+      .eq('user_id', currentUser.id)
       .order('started_at', { ascending: false });
 
     if (error) { toast(error.message, 'err'); return; }
@@ -756,3 +824,4 @@
   </script>
 </body>
 </html>
+
