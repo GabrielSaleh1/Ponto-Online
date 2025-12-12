@@ -29,23 +29,41 @@
       --green:#10b981;
       --text:#e5e7eb;
     }
-    html,body{background:radial-gradient(1200px 900px at 15% 10%, rgba(245,158,11,.10), transparent 55%),
-                          radial-gradient(1100px 800px at 85% 20%, rgba(239,68,68,.07), transparent 58%),
-                          radial-gradient(900px 700px at 70% 95%, rgba(16,185,129,.06), transparent 55%),
-                          linear-gradient(180deg, var(--bg0), var(--bg1));
-              color:var(--text);}
+    html,body{
+      min-height:100%;
+      background:
+        radial-gradient(1200px 900px at 15% 10%, rgba(245,158,11,.10), transparent 55%),
+        radial-gradient(1100px 800px at 85% 20%, rgba(239,68,68,.07), transparent 58%),
+        radial-gradient(900px 700px at 70% 95%, rgba(16,185,129,.06), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      color:var(--text);
+    }
+
+    /* ✅ FIX da “linha cortando”: removi mask-image e usei grid seguro */
     body::before{
-      content:""; position:fixed; inset:0; pointer-events:none; opacity:.30;
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      opacity:.22;
       background-image:
         linear-gradient(rgba(148,163,184,.10) 1px, transparent 1px),
         linear-gradient(90deg, rgba(148,163,184,.10) 1px, transparent 1px);
-      background-size: 64px 64px;
-      mask-image: radial-gradient(closest-side at 50% 30%, black 0%, transparent 75%);
+      background-size: 72px 72px;
+      /* sem mask-image (é o que causava a “costura” em alguns casos) */
+    }
+    /* Vinheta suave por cima do grid */
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background: radial-gradient(closest-side at 50% 35%, transparent 0%, rgba(0,0,0,.35) 70%, rgba(0,0,0,.55) 100%);
     }
 
     .glass{
       background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border:1px solid rgba(148,163,184,.18);
+      border:1px solid var(--stroke);
       box-shadow: 0 20px 60px rgba(0,0,0,.45);
       backdrop-filter: blur(10px);
     }
@@ -56,7 +74,7 @@
     }
     .soft{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.10)), var(--card2);
-      border:1px solid rgba(148,163,184,.18);
+      border:1px solid var(--stroke);
     }
     .chip{ background: rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.28); }
     .mono{ font-variant-numeric: tabular-nums; }
@@ -95,21 +113,21 @@
     .table thead tr{ background: rgba(245,158,11,.06); }
     .table th, .table td{ border-bottom: 1px dashed rgba(148,163,184,.22); }
     .table-tight th, .table-tight td{ padding-top:.65rem; padding-bottom:.65rem; }
+
+    /* garante que pseudo-elements não atrapalhem clique */
+    body::before, body::after { z-index:0; }
+    #appRoot { position:relative; z-index:1; }
   </style>
 
   <script>
     tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Inter', 'Roboto', 'Arial'] }
-        }
-      }
+      theme: { extend: { fontFamily: { sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Inter', 'Roboto', 'Arial'] } } }
     }
   </script>
 </head>
 
 <body>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+  <div id="appRoot" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
     <!-- Top bar -->
     <header class="glass rounded-3xl p-5 sm:p-6 mb-6">
@@ -127,7 +145,7 @@
         <div class="ml-auto flex items-center gap-2 flex-wrap">
           <span class="badge chip"><span class="opacity-80">Meta:</span> <b class="ml-1">10h/semana</b></span>
           <span class="badge chip"><span class="opacity-80">Fuso:</span> <b class="ml-1">America/Sao_Paulo</b></span>
-          <span class="badge btn-outline" id="clockBadge" title="Hora local">--:--</span>
+          <span class="badge btn-outline mono" id="clockBadge" title="Hora local">--:--</span>
           <button id="btnLogout" class="btn btn-outline hidden" type="button" title="Sair">
             <span aria-hidden="true">🚪</span><span class="hidden sm:inline">Sair</span>
           </button>
@@ -315,7 +333,7 @@
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
 
-  // metas para o badge no ranking (em minutos)
+  // metas (minutos)
   const META_MIN = 10*60;
   const LEVE_MIN = 7*60;
 
@@ -359,11 +377,11 @@
     return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;
   }
   function fmtDate(iso){ return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm'); }
-  function hhmmss(t){
-    t=Math.max(0,Math.floor(t));
-    const h=String(Math.floor(t/3600)).padStart(2,'0');
-    const m=String(Math.floor((t%3600)/60)).padStart(2,'0');
-    const s=String(t%60).padStart(2,'0');
+  function hhmmss(totalSeconds){
+    const t = Math.max(0, Math.floor(totalSeconds));
+    const h = String(Math.floor(t/3600)).padStart(2,'0');
+    const m = String(Math.floor((t%3600)/60)).padStart(2,'0');
+    const s = String(t%60).padStart(2,'0');
     return `${h}:${m}:${s}`;
   }
   function fmtDurSecs(totalSeconds){
@@ -412,7 +430,7 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Se já tiver sessão, entra direto
+    // sessão automática
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session?.user) {
       currentUser = session.user;
@@ -459,7 +477,6 @@
   }
 
   async function initAppAfterLogin(){
-    // carrega officer pelo user_id
     const { data: officer, error: offErr } = await supabaseClient
       .from('officers')
       .select('id,name,current_rank_id,active')
@@ -480,11 +497,9 @@
 
     currentOfficer = officer;
 
-    // carrega ranks e define default
     await loadRanks();
     await setDefaultRank();
 
-    // mostra app
     document.getElementById('loginAuth').classList.add('hidden');
     document.getElementById('mainSection').classList.remove('hidden');
     document.getElementById('statsSection').classList.remove('hidden');
@@ -492,7 +507,6 @@
 
     updateWhoText();
     await refreshState(true);
-
     initStats();
   }
 
@@ -523,7 +537,6 @@
   async function setDefaultRank(){
     const rSel = document.getElementById('rankSelect');
 
-    // tenta última patente usada no último shift do próprio usuário
     const { data: lastShift } = await supabaseClient
       .from('shifts').select('rank_id')
       .eq('user_id', currentUser.id)
@@ -542,6 +555,21 @@
     currentRank = rk || currentRank;
     updateWhoText();
   }
+
+  // ✅ TIMER instantâneo (tick imediato + interval)
+  function runTimer(){
+    stopTimer();
+
+    const tick = () => {
+      if (!activeShift?.started_at) return;
+      const diffSeconds = dayjs().diff(dayjs(activeShift.started_at), 'second');
+      document.getElementById('runningTimer').textContent = hhmmss(diffSeconds);
+    };
+
+    tick(); // 👈 atualiza na hora
+    timerInterval = setInterval(tick, 1000);
+  }
+  function stopTimer(){ if(timerInterval){clearInterval(timerInterval);timerInterval=null;} }
 
   // ---------- Estado / Turno ----------
   async function refreshState(showToast=false){
@@ -594,12 +622,9 @@
       updateWhoText();
     }
 
-    // IMPORTANTE:
-    // NÃO enviar officer_id nem user_id.
-    // O TRIGGER NO BANCO define e valida tudo.
     const { data, error } = await supabaseClient
       .from('shifts')
-      .insert([{ rank_id: currentRank?.id ?? null }])
+      .insert([{ rank_id: currentRank?.id ?? null }])  // ✅ não envia officer_id
       .select().single();
 
     setBusy(btn, false);
@@ -607,7 +632,10 @@
     if (error) return toast('Erro: ' + error.message, 'err');
 
     activeShift = data;
+
+    runTimer(); // ✅ começa na hora
     toast('Patrulha iniciada.', 'ok');
+
     refreshState(false);
     loadWeeklyStats_v2();
   }
@@ -619,11 +647,9 @@
     const btn = document.getElementById('btnStop');
     setBusy(btn, true);
 
-    // IMPORTANTE:
-    // Só atualiza ended_at (trigger vai forçar NOW e bloquear alterações indevidas)
     const { error } = await supabaseClient
       .from('shifts')
-      .update({ ended_at: new Date().toISOString() }) // o trigger vai sobrescrever para now()
+      .update({ ended_at: new Date().toISOString() })
       .eq('id', activeShift.id);
 
     setBusy(btn, false);
@@ -666,15 +692,6 @@
       tbody.appendChild(tr);
     });
   }
-
-  function runTimer(){
-    stopTimer();
-    timerInterval=setInterval(()=>{
-      const diff=dayjs.duration(dayjs().diff(dayjs(activeShift.started_at)));
-      document.getElementById('runningTimer').textContent=hhmmss(diff.asSeconds());
-    },1000);
-  }
-  function stopTimer(){ if(timerInterval){clearInterval(timerInterval);timerInterval=null;} }
 
   // ---------- Estatísticas semanais ----------
   document.addEventListener('click', (e)=>{
@@ -824,4 +841,5 @@
   </script>
 </body>
 </html>
+
 
