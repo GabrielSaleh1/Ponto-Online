@@ -5,179 +5,301 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0b0f16" />
   <title>ROTA • Bate Ponto Online</title>
+
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase + Dayjs -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/timezone.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/duration.js"></script>
-  <style>
-    /* Paleta e toques de tema ROTA: preto/ardósia, dourado/âmbar, vermelho */
-    :root{
-      --rota-bg: #0b0f16;
-      --rota-card: #121826;
-      --rota-soft: #1a2235;
-      --rota-gold: #f59e0b; /* amber-500 */
-      --rota-gold-700: #b45309;
-      --rota-red: #ef4444;  /* red-500 */
-      --rota-green: #10b981;/* emerald-500 */
-      --rota-text: #e5e7eb; /* slate-200 */
-      --rota-sub: #94a3b8;  /* slate-400 */
-    }
-    html, body { background: var(--rota-bg); color: var(--rota-text); }
-    .rota-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04)), var(--rota-card); border: 1px solid rgba(245,158,11,0.12); }
-    .rota-soft { background: var(--rota-soft); }
-    .rota-title { letter-spacing: .04em; }
-    .rota-divider { border-color: rgba(245,158,11,0.2); }
-    .rota-accent { color: var(--rota-gold); }
-    .rota-chip  { background: rgba(245,158,11,0.12); color: var(--rota-text); border: 1px solid rgba(245,158,11,0.25); }
-    .rota-table thead tr { background: rgba(245,158,11,0.06); }
-    .rota-table th, .rota-table td { border-bottom: 1px dashed rgba(148,163,184,0.2); }
-    .btn {
-      display:inline-flex;align-items:center;gap:.5rem;
-      font-weight:600; border-radius: .75rem; padding:.6rem 1rem;
-      transition: transform .06s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease;
-      border:1px solid transparent;
-    }
-    .btn:active { transform: translateY(1px); }
-    .btn-gold { background: var(--rota-gold); color: #0b0f16; border-color: var(--rota-gold-700); }
-    .btn-gold:hover { background:#fbbf24; }
-    .btn-red  { background: var(--rota-red); color: #fff; border-color:#b91c1c; }
-    .btn-red:hover{ background:#f87171; }
-    .btn-green{ background: var(--rota-green); color:#042016; border-color:#065f46; }
-    .btn-green:hover{ background:#34d399; }
-    .btn-ghost{ background: transparent; color: var(--rota-text); border-color: rgba(148,163,184,.25); }
-    .btn-ghost:hover{ background: rgba(148,163,184,.08); }
 
-    /* Faixa “tactical” diagonal no topo */
-    .tactical-band {
-      position: relative; overflow: hidden;
-      background: linear-gradient(120deg, rgba(245,158,11,.16) 0%, rgba(245,158,11,.0) 60%), var(--rota-soft);
-      border:1px solid rgba(245,158,11,0.2);
+  <style>
+    :root{
+      --bg0:#070a10;
+      --bg1:#0b0f16;
+      --card:#111827;
+      --card2:#0f172a;
+      --stroke:rgba(148,163,184,.18);
+      --stroke2:rgba(245,158,11,.22);
+      --gold:#f59e0b;
+      --gold2:#fbbf24;
+      --red:#ef4444;
+      --green:#10b981;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
     }
-    .tactical-band::after{
-      content:""; position:absolute; inset:-40% -30%;
-      background:
-        repeating-linear-gradient(135deg,
-          rgba(239, 68, 68, .22) 0 10px,
-          rgba(239, 68, 68, 0) 10px 22px);
-      transform: rotate(-2deg);
-      pointer-events:none; mix-blend-mode: overlay;
+    html,body{background:radial-gradient(1200px 900px at 15% 10%, rgba(245,158,11,.10), transparent 55%),
+                          radial-gradient(1100px 800px at 85% 20%, rgba(239,68,68,.07), transparent 58%),
+                          radial-gradient(900px 700px at 70% 95%, rgba(16,185,129,.06), transparent 55%),
+                          linear-gradient(180deg, var(--bg0), var(--bg1));
+              color:var(--text);}
+    /* subtle grid */
+    body::before{
+      content:""; position:fixed; inset:0; pointer-events:none; opacity:.30;
+      background-image:
+        linear-gradient(rgba(148,163,184,.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.10) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(closest-side at 50% 30%, black 0%, transparent 75%);
     }
-    .badge {
-      font-size:.75rem; padding:.25rem .5rem; border-radius:.5rem; border:1px solid transparent; display:inline-block;
+
+    .glass{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--stroke);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      backdrop-filter: blur(10px);
     }
-    .badge-ok    { background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.35); color:#a7f3d0; }
-    .badge-leve  { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.35); color:#fde68a; }
-    .badge-alta  { background:rgba(239,68,68,.12);  border-color:rgba(239,68,68,.35);  color:#fecaca; }
-    .mono { font-variant-numeric: tabular-nums; }
-    .table-tight th, .table-tight td { padding-top:.6rem; padding-bottom:.6rem; }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.15)), var(--card);
+      border:1px solid rgba(245,158,11,.14);
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
+    }
+    .soft{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.10)), var(--card2);
+      border:1px solid var(--stroke);
+    }
+    .chip{ background: rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.28); }
+    .mono{ font-variant-numeric: tabular-nums; }
+    .focus-ring:focus{ outline:none; box-shadow: 0 0 0 3px rgba(245,158,11,.25); border-color: rgba(245,158,11,.45); }
+
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
+      font-weight:700; border-radius: .95rem; padding:.7rem 1.05rem;
+      transition: transform .06s ease, box-shadow .25s ease, background-color .2s ease, border-color .2s ease, opacity .2s ease;
+      border:1px solid transparent;
+      user-select:none;
+      will-change: transform;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn[disabled]{ opacity:.55; cursor:not-allowed; }
+    .btn-gold{ background: var(--gold); color:#081018; border-color: rgba(180,83,9,.85); }
+    .btn-gold:hover{ background: var(--gold2); }
+    .btn-red{ background: var(--red); color:#fff; border-color: rgba(185,28,28,.9); }
+    .btn-red:hover{ background: #f87171; }
+    .btn-green{ background: var(--green); color:#031c14; border-color: rgba(6,95,70,.9); }
+    .btn-green:hover{ background: #34d399; }
+    .btn-ghost{ background: rgba(148,163,184,.06); color: var(--text); border-color: rgba(148,163,184,.22); }
+    .btn-ghost:hover{ background: rgba(148,163,184,.10); }
+    .btn-outline{ background: transparent; color: var(--text); border-color: rgba(148,163,184,.30); }
+    .btn-outline:hover{ background: rgba(148,163,184,.08); }
+
+    .badge{
+      font-size:.75rem; padding:.28rem .55rem; border-radius:.7rem;
+      border:1px solid transparent; display:inline-flex; gap:.35rem; align-items:center;
+      white-space:nowrap;
+    }
+    .badge-ok{ background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.35); color:#a7f3d0; }
+    .badge-leve{ background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.35); color:#fde68a; }
+    .badge-alta{ background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); color:#fecaca; }
+
+    .table thead tr{ background: rgba(245,158,11,.06); }
+    .table th, .table td{ border-bottom: 1px dashed rgba(148,163,184,.22); }
+    .table-tight th, .table-tight td{ padding-top:.65rem; padding-bottom:.65rem; }
   </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Inter', 'Roboto', 'Arial'] }
+        }
+      }
+    }
+  </script>
 </head>
+
 <body>
-  <div class="max-w-6xl mx-auto p-6">
-    <!-- Header ROTA -->
-    <header class="tactical-band rounded-2xl p-5 mb-6">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <!-- Top bar -->
+    <header class="glass rounded-3xl p-5 sm:p-6 mb-6">
       <div class="flex items-center gap-4 flex-wrap">
-        <div class="h-10 w-10 rounded-xl flex items-center justify-center rota-card ring-1 ring-amber-500/30 text-xl font-black">R</div>
-        <div>
-          <h1 class="text-2xl md:text-3xl font-extrabold rota-title tracking-wide">ROTA • Bate Ponto Online</h1>
-          <p class="text-sm text-slate-400">Rondas Ostensivas Tobias de Aguiar — Controle de patrulhamento</p>
+        <div class="relative">
+          <div class="h-11 w-11 rounded-2xl grid place-items-center card text-xl font-black">R</div>
+          <span class="absolute -right-1 -bottom-1 h-4 w-4 rounded-full bg-amber-500 ring-2 ring-black/50"></span>
+        </div>
+
+        <div class="min-w-[240px]">
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wide">ROTA • Bate Ponto Online</h1>
+          <p class="text-sm text-slate-300/80">Controle de patrulhamento • GTA RP</p>
+        </div>
+
+        <div class="ml-auto flex items-center gap-2 flex-wrap">
+          <span class="badge chip"><span class="opacity-80">Meta:</span> <b class="ml-1">10h/semana</b></span>
+          <span class="badge chip"><span class="opacity-80">Fuso:</span> <b class="ml-1">America/Sao_Paulo</b></span>
+          <span class="badge btn-outline" id="clockBadge" title="Hora local">--:--</span>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3 flex-wrap">
+        <div class="badge btn-outline" title="Dica: use 'Recarregar lista' se alguém novo não aparecer">
+          <span aria-hidden="true">🛡️</span>
+          <span class="text-slate-300/90">Registre início/fim • Sem duplicar patrulhas</span>
         </div>
         <div class="ml-auto flex items-center gap-2">
-          <span class="badge rota-chip">Meta semanal: <b class="ml-1">10h</b></span>
-          <span class="badge rota-chip">Fuso: <b class="ml-1">America/Sao_Paulo</b></span>
+          <button id="themeHint" class="btn btn-outline" type="button" title="Atalhos">
+            <span aria-hidden="true">⌨️</span><span class="hidden sm:inline">Atalhos</span>
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Identificação -->
-    <section id="loginSection" class="mb-6 rota-card rounded-2xl p-5">
-      <h2 class="text-lg font-semibold mb-3">Identificação</h2>
+    <!-- Login -->
+    <section id="loginSection" class="card rounded-3xl p-5 sm:p-6 mb-6">
+      <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <h2 class="text-lg sm:text-xl font-semibold">Identificação</h2>
+          <p class="text-sm text-slate-300/75 mt-1">Selecione seu nome e patente para iniciar.</p>
+        </div>
+        <div class="badge chip">
+          <span aria-hidden="true">ℹ️</span>
+          <span class="text-slate-200/90">Dados salvos no Supabase</span>
+        </div>
+      </div>
+
       <div class="grid sm:grid-cols-3 gap-3 items-end">
         <div class="sm:col-span-2">
-          <label class="block text-sm text-slate-400 mb-1">Policial</label>
-          <select id="officerSelect" class="w-full px-4 py-2 rounded-xl border border-slate-600/40 bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-amber-500/40"></select>
+          <label class="block text-sm text-slate-300/80 mb-1">Policial</label>
+          <select id="officerSelect" class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"></select>
         </div>
+
         <div>
-          <label class="block text-sm text-slate-400 mb-1">Patente</label>
-          <select id="rankSelect" class="w-full px-4 py-2 rounded-xl border border-slate-600/40 bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-amber-500/40"></select>
+          <label class="block text-sm text-slate-300/80 mb-1">Patente</label>
+          <select id="rankSelect" class="focus-ring w-full px-4 py-2.5 rounded-2xl border border-slate-600/40 bg-slate-950/30"></select>
         </div>
       </div>
-      <div class="mt-4 flex gap-3">
-        <button id="enterBtn" class="btn btn-gold">Entrar</button>
-        <button id="reloadLists" class="btn btn-ghost">Recarregar lista</button>
+
+      <div class="mt-4 flex gap-3 flex-wrap">
+        <button id="enterBtn" class="btn btn-gold" type="button">
+          <span aria-hidden="true">➡️</span> Entrar
+        </button>
+        <button id="reloadLists" class="btn btn-ghost" type="button">
+          <span aria-hidden="true">🔄</span> Recarregar lista
+        </button>
+        <span id="loginMsg" class="text-sm text-slate-300/80 self-center"></span>
       </div>
-      <p id="loginMsg" class="text-sm text-slate-400 mt-2"></p>
     </section>
 
-    <!-- Grid principal -->
+    <!-- Main grid -->
     <div id="contentGrid" class="grid gap-6 items-start lg:grid-cols-5">
-      <!-- Painel principal -->
+      <!-- Left: status + my shifts -->
       <section id="mainSection" class="hidden lg:col-span-2 space-y-6">
-        <div class="rota-card rounded-2xl p-5">
-          <h2 class="text-xl font-semibold mb-2">Status de patrulha</h2>
-          <p id="whoText" class="text-slate-400 text-sm mb-1">—</p>
-          <p id="statusText" class="text-slate-300">Fora de patrulha</p>
-          <p id="runningTimer" class="text-4xl font-extrabold mt-2 mono rota-accent">00:00:00</p>
-          <div class="mt-4 flex gap-3">
-            <button id="btnStart" class="btn btn-green">Iniciar patrulha</button>
-            <button id="btnStop"  class="btn btn-red hidden">Encerrar</button>
+        <div class="card rounded-3xl p-5 sm:p-6">
+          <div class="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <h2 class="text-xl font-semibold">Status de patrulha</h2>
+              <p id="whoText" class="text-slate-300/80 text-sm mt-1">—</p>
+            </div>
+            <span id="liveBadge" class="badge btn-outline">OFFLINE</span>
           </div>
+
+          <p id="statusText" class="text-slate-200/90">Fora de patrulha</p>
+
+          <div class="mt-3 soft rounded-3xl p-4">
+            <p class="text-xs text-slate-300/70">Tempo em patrulha</p>
+            <p id="runningTimer" class="text-4xl font-extrabold mt-1 mono text-amber-400">00:00:00</p>
+          </div>
+
+          <div class="mt-4 flex gap-3 flex-wrap">
+            <button id="btnStart" class="btn btn-green" type="button">
+              <span aria-hidden="true">▶️</span> Iniciar patrulha
+            </button>
+            <button id="btnStop" class="btn btn-red hidden" type="button">
+              <span aria-hidden="true">⏹️</span> Encerrar
+            </button>
+            <button id="btnRefresh" class="btn btn-ghost" type="button" title="Atualizar estado">
+              <span aria-hidden="true">↻</span> Atualizar
+            </button>
+          </div>
+
+          <p class="text-xs text-slate-300/70 mt-3">
+            Dica: se você fechou o navegador durante uma patrulha, use <b>Atualizar</b> ao entrar para recuperar o status.
+          </p>
         </div>
 
-        <div class="rota-card rounded-2xl p-5">
-          <h3 class="text-lg font-semibold mb-4">Patrulhamentos registrados</h3>
+        <div class="card rounded-3xl p-5 sm:p-6">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 class="text-lg font-semibold">Meus patrulhamentos</h3>
+            <span class="badge chip"><span aria-hidden="true">🗂️</span> Histórico</span>
+          </div>
+
           <div class="overflow-x-auto">
-            <table class="w-full text-sm rota-table table-tight">
+            <table class="w-full text-sm table table-tight">
               <thead>
-                <tr class="text-left text-slate-300">
-                  <th class="py-2">Início</th>
-                  <th class="py-2">Término</th>
-                  <th class="py-2">Duração</th>
+                <tr class="text-left text-slate-300/90">
+                  <th class="py-2 pr-3">Início</th>
+                  <th class="py-2 pr-3">Término</th>
+                  <th class="py-2 pr-3">Duração</th>
                 </tr>
               </thead>
               <tbody id="shiftTable"></tbody>
             </table>
           </div>
+
+          <div id="myEmptyState" class="hidden mt-4 text-sm text-slate-300/75">
+            Nenhum patrulhamento encontrado ainda.
+          </div>
         </div>
       </section>
 
-      <!-- Estatísticas -->
-      <section id="statsSection" class="hidden lg:col-span-3 rota-card rounded-2xl p-5 lg:sticky lg:top-4">
+      <!-- Right: weekly stats -->
+      <section id="statsSection" class="hidden lg:col-span-3 card rounded-3xl p-5 sm:p-6 lg:sticky lg:top-4">
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <h3 class="text-xl font-semibold">Estatísticas da semana</h3>
-          <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
+          <div>
+            <h3 class="text-xl font-semibold">Estatísticas da semana</h3>
+            <p class="text-sm text-slate-300/75 mt-1">Ranking por tempo acumulado (seg → h/m/s).</p>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-200/90">
             <span class="badge badge-ok">OK</span>
             <span class="badge badge-leve">Iminência leve</span>
             <span class="badge badge-alta">Iminência alta</span>
           </div>
         </div>
-        <div class="flex items-center gap-3 mb-4 text-sm">
-          <button id="btnPrevWeek" class="btn btn-ghost">◀ Semana anterior</button>
-          <div id="weekLabel" class="font-medium rota-accent"></div>
-          <button id="btnNextWeek" class="btn btn-ghost">Semana seguinte ▶</button>
-          <button id="btnThisWeek" class="ml-auto btn btn-ghost">Esta semana</button>
+
+        <div class="flex items-center gap-3 mb-4 flex-wrap">
+          <button id="btnPrevWeek" class="btn btn-ghost" type="button">◀ Semana anterior</button>
+          <div id="weekLabel" class="font-semibold text-amber-400"></div>
+          <button id="btnNextWeek" class="btn btn-ghost" type="button">Semana seguinte ▶</button>
+          <button id="btnThisWeek" class="ml-auto btn btn-outline" type="button">Esta semana</button>
         </div>
+
         <div class="overflow-x-auto">
-          <table class="w-full text-base rota-table table-tight">
+          <table class="w-full text-base table table-tight">
             <thead>
-              <tr class="text-left text-slate-300">
-                <th class="py-2">#</th>
-                <th class="py-2">Policial</th>
-                <th class="py-2">Patente</th>
-                <th class="py-2">Total</th>
-                <th class="py-2">Status</th>
+              <tr class="text-left text-slate-300/90">
+                <th class="py-2 pr-3">#</th>
+                <th class="py-2 pr-3">Policial</th>
+                <th class="py-2 pr-3">Patente</th>
+                <th class="py-2 pr-3">Total</th>
+                <th class="py-2 pr-3">Status</th>
               </tr>
             </thead>
             <tbody id="rankTable"></tbody>
           </table>
         </div>
+
+        <div id="rankEmptyState" class="hidden mt-4 text-sm text-slate-300/75">
+          Sem dados nesta semana.
+        </div>
       </section>
+    </div>
+
+    <!-- Mobile hint -->
+    <div class="lg:hidden glass rounded-3xl p-5 mt-6">
+      <p class="text-sm text-slate-200/90">
+        No celular, o painel completo aparece após <b>Entrar</b> (layout é melhor em telas maiores).
+      </p>
     </div>
   </div>
 
+  <!-- Toast -->
+  <div id="toastWrap" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[min(680px,calc(100%-2rem))] pointer-events-none"></div>
+
   <script>
+  // === CONFIG ===
   const SUPABASE_URL = "https://ilonwkgtdszmpcjwlezc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlsb253a2d0ZHN6bXBjandsZXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NzQxMDIsImV4cCI6MjA3NTU1MDEwMn0.Cc-BtnHlXaGVCY6T6iXe0QA1tsfc17aX8lswEICvtw0";
   const TZ = 'America/Sao_Paulo';
@@ -188,6 +310,57 @@
   let currentOfficer=null;
   let currentRank=null;
   let weekOffset = 0;
+
+  // === UI helpers ===
+  function toast(message, type='info'){
+    const wrap = document.getElementById('toastWrap');
+    const el = document.createElement('div');
+    const cls = type==='ok' ? 'badge-ok' : type==='warn' ? 'badge-leve' : type==='err' ? 'badge-alta' : 'btn-outline';
+    el.className = `pointer-events-none glass rounded-2xl p-4 mb-2 border border-slate-500/25`;
+    el.innerHTML = `<div class="flex items-start gap-3">
+        <div class="mt-0.5 ${cls} badge">${type==='ok'?'✅':type==='warn'?'⚠️':type==='err'?'⛔':'ℹ️'}</div>
+        <div class="text-sm text-slate-100/95">${escapeHtml(message)}</div>
+      </div>`;
+    wrap.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(6px)'; el.style.transition='opacity .25s ease, transform .25s ease'; }, 2400);
+    setTimeout(()=> el.remove(), 2800);
+  }
+
+  function setBusy(btn, busy=true){
+    if(!btn) return;
+    btn.disabled = !!busy;
+    btn.dataset._label ??= btn.innerHTML;
+    if(busy){
+      btn.innerHTML = `<span class="inline-block h-4 w-4 rounded-full border border-slate-200/40 border-t-transparent animate-spin"></span> Aguarde…`;
+    } else {
+      btn.innerHTML = btn.dataset._label;
+    }
+  }
+
+  function escapeHtml(s){
+    return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;
+  }
+  function fmtDate(iso){ return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm'); }
+  function hhmmss(t){
+    t=Math.max(0,Math.floor(t));
+    const h=String(Math.floor(t/3600)).padStart(2,'0');
+    const m=String(Math.floor((t%3600)/60)).padStart(2,'0');
+    const s=String(t%60).padStart(2,'0');
+    return `${h}:${m}:${s}`;
+  }
+  function fmtDurSecs(totalSeconds){
+    const secs = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(secs/3600);
+    const m = Math.floor((secs%3600)/60);
+    const s = secs%60;
+    return `${h}h${m}m${s}s`;
+  }
+
+  function updateClock(){
+    const el = document.getElementById('clockBadge');
+    if(!el) return;
+    el.textContent = dayjs().tz(TZ).format('HH:mm:ss');
+  }
 
   document.addEventListener('DOMContentLoaded', async () => {
     dayjs.extend(window.dayjs_plugin_utc);
@@ -201,34 +374,46 @@
     document.getElementById('reloadLists').addEventListener('click', loadLists);
     document.getElementById('btnStart').addEventListener('click', startShift);
     document.getElementById('btnStop').addEventListener('click', endShift);
+    document.getElementById('btnRefresh').addEventListener('click', () => refreshState(true));
+    document.getElementById('themeHint').addEventListener('click', () => {
+      toast('Atalhos: Enter = Entrar • S = Iniciar • E = Encerrar • R = Atualizar', 'info');
+    });
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'enter' && !document.getElementById('loginSection').classList.contains('hidden')) enterApp();
+      if (k === 's' && !document.getElementById('btnStart').classList.contains('hidden')) startShift();
+      if (k === 'e' && !document.getElementById('btnStop').classList.contains('hidden')) endShift();
+      if (k === 'r') refreshState(true);
+    });
+
+    setInterval(updateClock, 1000);
+    updateClock();
 
     await loadLists();
   });
-
-  // ---------- Helpers ----------
-  function escapeHtml(s){return s?.replace?.(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) ?? s;}
-  function fmtDate(iso){return dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm');}
-  function hhmmss(t){t=Math.max(0,Math.floor(t));const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return`${h}:${m}:${s}`;}
-  // duração com segundos (ex.: 1h23m45s)
-  function fmtDurSecs(totalSeconds){
-    const secs = Math.max(0, Math.floor(totalSeconds));
-    const h = Math.floor(secs/3600);
-    const m = Math.floor((secs%3600)/60);
-    const s = secs%60;
-    return `${h}h${m}m${s}s`;
-  }
 
   // ---------- Listas ----------
   async function loadLists(){
     const loginMsg = document.getElementById('loginMsg');
     loginMsg.textContent = 'Carregando listas…';
 
-    const { data: officers, error: offErr } = await supabaseClient
-      .from('officers').select('id,name,current_rank_id,active').eq('active', true).order('name', { ascending: true });
-    const { data: ranks } = await supabaseClient
-      .from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+    const btn = document.getElementById('reloadLists');
+    setBusy(btn, true);
 
-    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; return; }
+    const { data: officers, error: offErr } = await supabaseClient
+      .from('officers').select('id,name,current_rank_id,active')
+      .eq('active', true).order('name', { ascending: true });
+
+    const { data: ranks, error: rkErr } = await supabaseClient
+      .from('ranks').select('id,name,sort_order')
+      .order('sort_order', { ascending: true });
+
+    setBusy(btn, false);
+
+    if (offErr) { loginMsg.textContent = 'Erro ao carregar policiais: ' + offErr.message; toast(offErr.message, 'err'); return; }
+    if (rkErr) { loginMsg.textContent = 'Erro ao carregar patentes: ' + rkErr.message; toast(rkErr.message, 'err'); return; }
 
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
@@ -237,19 +422,27 @@
     rSel.innerHTML = (ranks||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
     loginMsg.textContent = '';
+    toast('Lista atualizada.', 'ok');
 
-    oSel.addEventListener('change', () => { setDefaultRankForOfficer(oSel.value); });
+    oSel.onchange = () => { setDefaultRankForOfficer(oSel.value); };
     if (oSel.value) { await setDefaultRankForOfficer(oSel.value); }
   }
 
   async function setDefaultRankForOfficer(officerId) {
     const rSel = document.getElementById('rankSelect');
+
+    // tenta última patente usada no último shift
     const { data: lastShift } = await supabaseClient
-      .from('shifts').select('rank_id').eq('officer_id', officerId)
-      .not('rank_id', 'is', null).order('started_at', { ascending: false }).limit(1);
+      .from('shifts').select('rank_id')
+      .eq('officer_id', officerId)
+      .not('rank_id', 'is', null)
+      .order('started_at', { ascending: false }).limit(1);
+
     if (lastShift && lastShift.length && lastShift[0].rank_id) {
-      rSel.value = String(lastShift[0].rank_id); return;
+      rSel.value = String(lastShift[0].rank_id);
+      return;
     }
+
     const oSel = document.getElementById('officerSelect');
     const opt = oSel.options[oSel.selectedIndex];
     const defRank = opt?.getAttribute('data-rank');
@@ -261,87 +454,147 @@
   async function enterApp(){
     const oSel = document.getElementById('officerSelect');
     const rSel = document.getElementById('rankSelect');
-    if (!oSel.value) return alert('Selecione o policial.');
+
+    if (!oSel.value) return toast('Selecione o policial.', 'warn');
     if (!rSel.value) await setDefaultRankForOfficer(oSel.value);
 
-    const { data: officer } = await supabaseClient.from('officers').select('id,name').eq('id', oSel.value).single();
-    const { data: rank } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
-    currentOfficer = officer; currentRank = rank;
+    const enterBtn = document.getElementById('enterBtn');
+    setBusy(enterBtn, true);
+
+    const { data: officer, error: offErr } = await supabaseClient
+      .from('officers').select('id,name').eq('id', oSel.value).single();
+
+    const { data: rank, error: rkErr } = await supabaseClient
+      .from('ranks').select('id,name').eq('id', rSel.value).single();
+
+    setBusy(enterBtn, false);
+
+    if (offErr) return toast('Erro: ' + offErr.message, 'err');
+    if (rkErr) return toast('Erro: ' + rkErr.message, 'err');
+
+    currentOfficer = officer;
+    currentRank = rank;
 
     document.getElementById('loginSection').classList.add('hidden');
     document.getElementById('mainSection').classList.remove('hidden');
     document.getElementById('statsSection').classList.remove('hidden');
-    document.getElementById('whoText').textContent = `${officer.name} • ${rank.name}`;
 
-    refreshState();
+    document.getElementById('whoText').textContent = `${officer.name} • ${rank.name}`;
+    toast(`Bem-vindo, ${officer.name}.`, 'ok');
+
+    await refreshState(true);
     initStats();
   }
 
-  async function refreshState(){
-    const { data } = await supabaseClient
+  async function refreshState(showToast=false){
+    if(!currentOfficer) return;
+
+    const { data, error } = await supabaseClient
       .from('shifts').select('*')
       .eq('officer_id', currentOfficer.id)
       .is('ended_at', null)
       .order('started_at', { ascending: false })
       .limit(1);
 
+    if (error) { toast(error.message, 'err'); return; }
+
     activeShift = data && data[0] ? data[0] : null;
 
+    const liveBadge = document.getElementById('liveBadge');
     if (activeShift) {
       document.getElementById('statusText').textContent = 'Em patrulha desde ' + fmtDate(activeShift.started_at);
       document.getElementById('btnStart').classList.add('hidden');
       document.getElementById('btnStop').classList.remove('hidden');
+      liveBadge.className = 'badge badge-ok';
+      liveBadge.textContent = 'EM PATRULHA';
       runTimer();
     } else {
       document.getElementById('statusText').textContent = 'Fora de patrulha';
       document.getElementById('btnStart').classList.remove('hidden');
       document.getElementById('btnStop').classList.add('hidden');
+      liveBadge.className = 'badge btn-outline';
+      liveBadge.textContent = 'OFFLINE';
       stopTimer();
       document.getElementById('runningTimer').textContent = '00:00:00';
     }
-    loadMyShifts();
+
+    await loadMyShifts();
+    if(showToast) toast('Atualizado.', 'info');
   }
 
   async function startShift(){
-    if (activeShift) return;
+    if (!currentOfficer) return;
+    if (activeShift) return toast('Você já está em patrulha.', 'warn');
+
+    const btn = document.getElementById('btnStart');
+    setBusy(btn, true);
+
     const rSel = document.getElementById('rankSelect');
     if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
       const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
       currentRank = rk || currentRank;
     }
+
     const { data, error } = await supabaseClient
       .from('shifts')
       .insert([{ officer_id: currentOfficer.id, rank_id: currentRank.id, started_at: new Date().toISOString() }])
       .select().single();
-    if (error) return alert('Erro: '+error.message);
+
+    setBusy(btn, false);
+
+    if (error) return toast('Erro: ' + error.message, 'err');
     activeShift = data;
-    refreshState();
+    toast('Patrulha iniciada.', 'ok');
+    refreshState(false);
   }
 
   async function endShift(){
-    if (!activeShift) return;
+    if (!currentOfficer) return;
+    if (!activeShift) return toast('Nenhuma patrulha em andamento.', 'warn');
+
+    const btn = document.getElementById('btnStop');
+    setBusy(btn, true);
+
     const { error } = await supabaseClient
       .from('shifts').update({ ended_at: new Date().toISOString() }).eq('id', activeShift.id);
-    if (error) return alert('Erro: '+error.message);
-    activeShift=null;
-    refreshState();
+
+    setBusy(btn, false);
+
+    if (error) return toast('Erro: ' + error.message, 'err');
+    toast('Patrulha encerrada.', 'ok');
+    activeShift = null;
+    refreshState(false);
+    loadWeeklyStats_v2(); // atualiza ranking
   }
 
   async function loadMyShifts(){
-    const { data } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from('shifts').select('id, started_at, ended_at')
       .eq('officer_id', currentOfficer.id)
       .order('started_at', { ascending: false });
+
+    if (error) { toast(error.message, 'err'); return; }
+
     const tbody = document.getElementById('shiftTable');
-    tbody.innerHTML='';
-    (data||[]).forEach(s=>{
+    const empty = document.getElementById('myEmptyState');
+    tbody.innerHTML = '';
+
+    if (!data || !data.length){
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    data.forEach(s=>{
       const durationSecs = s.ended_at
         ? Math.max(0, Math.floor(dayjs(s.ended_at).diff(dayjs(s.started_at), 'second')))
         : 0;
+
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td class='py-2 pr-3'>${fmtDate(s.started_at)}</td>
-                    <td class='py-2 pr-3'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-red-400">em andamento…</span>'}</td>
-                    <td class='py-2 pr-3 mono'>${s.ended_at?fmtDurSecs(durationSecs):'—'}</td>`;
+      tr.innerHTML = `
+        <td class='py-2 pr-3 text-slate-200/95'>${fmtDate(s.started_at)}</td>
+        <td class='py-2 pr-3 text-slate-200/95'>${s.ended_at?fmtDate(s.ended_at):'<span class="text-red-300">em andamento…</span>'}</td>
+        <td class='py-2 pr-3 mono text-amber-300'>${s.ended_at?fmtDurSecs(durationSecs):'—'}</td>`;
       tbody.appendChild(tr);
     });
   }
@@ -357,9 +610,9 @@
 
   // ---------- Estatísticas semanais ----------
   document.addEventListener('click', (e)=>{
-    if (e.target && e.target.id === 'btnPrevWeek') { changeWeek(-1); }
-    if (e.target && e.target.id === 'btnNextWeek') { changeWeek(1); }
-    if (e.target && e.target.id === 'btnThisWeek') { setWeek(0); }
+    if (e.target && e.target.id === 'btnPrevWeek') changeWeek(-1);
+    if (e.target && e.target.id === 'btnNextWeek') changeWeek(1);
+    if (e.target && e.target.id === 'btnThisWeek') setWeek(0);
   });
 
   function initStats(){ updateWeekLabel(); loadWeeklyStats_v2(); }
@@ -369,7 +622,7 @@
   function getWeekRange(offset){
     offset = offset||0;
     const today = dayjs().tz(TZ).add(offset, 'week');
-    const dow = (today.day()+6)%7; // segunda-feira como início
+    const dow = (today.day()+6)%7; // segunda-feira
     const start = today.startOf('day').subtract(dow, 'day');
     const end = start.add(7,'day');
     return { start, end };
@@ -381,7 +634,6 @@
     el.textContent = `${start.format('DD/MM')} — ${end.subtract(1,'day').format('DD/MM/YYYY')}`;
   }
 
-  // Patente = última usada na semana; se não teve, última antes do fim da semana
   async function loadWeeklyStats_v2(){
     const { start, end } = getWeekRange(weekOffset);
     const startIso = start.toISOString();
@@ -389,20 +641,23 @@
 
     const { data: officers } = await supabaseClient
       .from('officers').select('id,name,current_rank_id').order('name', { ascending: true });
+
     const { data: ranks } = await supabaseClient
       .from('ranks').select('id,name,sort_order').order('sort_order', { ascending: true });
+
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
     // shifts que tocam a semana
     const { data: sA } = await supabaseClient
       .from('shifts').select('officer_id, rank_id, started_at, ended_at')
       .gte('started_at', startIso).lt('started_at', endIso);
+
     const { data: sB } = await supabaseClient
       .from('shifts').select('officer_id, rank_id, started_at, ended_at')
       .lt('started_at', startIso).or(`ended_at.is.null,ended_at.gte.${startIso}`);
+
     const allShifts = [...(sA||[]), ...(sB||[])];
 
-    // agrupa por policial
     const grouped = new Map();
     for (const s of allShifts) {
       if (!s.officer_id) continue;
@@ -411,8 +666,7 @@
       grouped.set(s.officer_id, arr);
     }
 
-    // totais (em segundos) e última patente usada
-    const totalsSecs = new Map();   // officer_id -> total segundos na semana
+    const totalsSecs = new Map();
     const lastRankInWeek = new Map();
 
     for (const [officerId, list] of grouped.entries()) {
@@ -439,7 +693,7 @@
       if (lastRank) lastRankInWeek.set(officerId, lastRank);
     }
 
-    // para quem não teve shift na semana: última patente antes do fim da semana
+    // fallback rank
     const needFallback = (officers||[]).filter(o => !lastRankInWeek.has(o.id));
     if (needFallback.length) {
       const ids = needFallback.map(o=>o.id);
@@ -447,6 +701,7 @@
         .from('shifts').select('officer_id, rank_id, started_at')
         .in('officer_id', ids).lt('started_at', endIso)
         .not('rank_id', 'is', null).order('started_at', { ascending: false });
+
       const seen = new Set();
       if (lastBefore) {
         for (const row of lastBefore) {
@@ -457,7 +712,6 @@
       }
     }
 
-    // se officers vier vazio por RLS, tenta ao menos os IDs que têm total
     let officersList = officers || [];
     if ((!officersList || officersList.length === 0) && totalsSecs.size) {
       const ids = [...totalsSecs.keys()];
@@ -479,21 +733,22 @@
     }).sort((a,b)=> b.secs - a.secs);
 
     const tbody = document.getElementById('rankTable');
-    if (!tbody) return;
+    const empty = document.getElementById('rankEmptyState');
     tbody.innerHTML='';
+
     if (!rows.length){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class='py-2 pr-3' colspan='5'>Nenhum policial encontrado.</td>`;
-      tbody.appendChild(tr);
+      empty.classList.remove('hidden');
       return;
     }
+    empty.classList.add('hidden');
+
     rows.forEach((r,i)=>{
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class='py-2 pr-3 text-slate-400 mono'>${String(i+1).padStart(2,'0')}</td>
-        <td class='py-2 pr-3'>${escapeHtml(r.officer)}</td>
-        <td class='py-2 pr-3 whitespace-nowrap'>${escapeHtml(r.rank)}</td>
-        <td class='py-2 pr-3 mono rota-accent'>${fmtDurSecs(r.secs)}</td>
+        <td class='py-2 pr-3 text-slate-300/80 mono'>${String(i+1).padStart(2,'0')}</td>
+        <td class='py-2 pr-3 text-slate-100/95'>${escapeHtml(r.officer)}</td>
+        <td class='py-2 pr-3 whitespace-nowrap text-slate-200/95'>${escapeHtml(r.rank)}</td>
+        <td class='py-2 pr-3 mono text-amber-300'>${fmtDurSecs(r.secs)}</td>
         <td class='py-2 pr-3'><span class='${r.badgeClass}'>${r.status}</span></td>`;
       tbody.appendChild(tr);
     });
