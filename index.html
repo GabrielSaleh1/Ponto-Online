@@ -39,7 +39,7 @@
       color:var(--text);
     }
 
-    /* ✅ FIX da “linha cortando”: removi mask-image e usei grid seguro */
+    /* ✅ FIX da “linha cortando”: sem mask-image */
     body::before{
       content:"";
       position:fixed;
@@ -50,16 +50,18 @@
         linear-gradient(rgba(148,163,184,.10) 1px, transparent 1px),
         linear-gradient(90deg, rgba(148,163,184,.10) 1px, transparent 1px);
       background-size: 72px 72px;
-      /* sem mask-image (é o que causava a “costura” em alguns casos) */
+      z-index:0;
     }
-    /* Vinheta suave por cima do grid */
     body::after{
       content:"";
       position:fixed;
       inset:0;
       pointer-events:none;
       background: radial-gradient(closest-side at 50% 35%, transparent 0%, rgba(0,0,0,.35) 70%, rgba(0,0,0,.55) 100%);
+      z-index:0;
     }
+
+    #appRoot{ position:relative; z-index:1; }
 
     .glass{
       background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
@@ -113,10 +115,6 @@
     .table thead tr{ background: rgba(245,158,11,.06); }
     .table th, .table td{ border-bottom: 1px dashed rgba(148,163,184,.22); }
     .table-tight th, .table-tight td{ padding-top:.65rem; padding-bottom:.65rem; }
-
-    /* garante que pseudo-elements não atrapalhem clique */
-    body::before, body::after { z-index:0; }
-    #appRoot { position:relative; z-index:1; }
   </style>
 
   <script>
@@ -165,7 +163,7 @@
       </div>
     </header>
 
-    <!-- LOGIN (Email/Senha) -->
+    <!-- LOGIN -->
     <section id="loginAuth" class="card rounded-3xl p-5 sm:p-6 mb-6 max-w-xl mx-auto">
       <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
@@ -206,7 +204,7 @@
 
     <!-- Main grid -->
     <div id="contentGrid" class="grid gap-6 items-start lg:grid-cols-5">
-      <!-- Left: status + my shifts -->
+      <!-- Left -->
       <section id="mainSection" class="hidden lg:col-span-2 space-y-6">
         <div class="card rounded-3xl p-5 sm:p-6">
           <div class="flex items-start justify-between gap-4 mb-3">
@@ -273,7 +271,7 @@
         </div>
       </section>
 
-      <!-- Right: weekly stats -->
+      <!-- Right -->
       <section id="statsSection" class="hidden lg:col-span-3 card rounded-3xl p-5 sm:p-6 lg:sticky lg:top-4">
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div>
@@ -556,20 +554,28 @@
     updateWhoText();
   }
 
-  // ✅ TIMER instantâneo (tick imediato + interval)
+  // ✅ TIMER instantâneo (sem esperar Supabase)
   function runTimer(){
     stopTimer();
 
     const tick = () => {
       if (!activeShift?.started_at) return;
-      const diffSeconds = dayjs().diff(dayjs(activeShift.started_at), 'second');
+      const diffSeconds = Math.floor(
+        (Date.now() - new Date(activeShift.started_at).getTime()) / 1000
+      );
       document.getElementById('runningTimer').textContent = hhmmss(diffSeconds);
     };
 
-    tick(); // 👈 atualiza na hora
+    tick(); // 🔥 na hora
     timerInterval = setInterval(tick, 1000);
   }
-  function stopTimer(){ if(timerInterval){clearInterval(timerInterval);timerInterval=null;} }
+
+  function stopTimer(){
+    if(timerInterval){
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
 
   // ---------- Estado / Turno ----------
   async function refreshState(showToast=false){
@@ -608,41 +614,66 @@
     if(showToast) toast('Atualizado.', 'info');
   }
 
+  // ✅ START com timer imediato + sincroniza com banco
   async function startShift(){
     if (!currentUser) return toast('Faça login.', 'warn');
     if (activeShift) return toast('Você já está em patrulha.', 'warn');
 
-    const btn = document.getElementById('btnStart');
-    setBusy(btn, true);
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    setBusy(btnStart, true);
 
-    const rSel = document.getElementById('rankSelect');
-    if (rSel.value && (!currentRank || String(currentRank.id) !== String(rSel.value))) {
-      const { data: rk } = await supabaseClient.from('ranks').select('id,name').eq('id', rSel.value).single();
-      currentRank = rk || currentRank;
-      updateWhoText();
-    }
+    // 1) começa localmente na hora
+    const localStartedAt = new Date().toISOString();
+    activeShift = { started_at: localStartedAt, _pending: true };
 
+    document.getElementById('statusText').textContent = 'Em patrulha desde ' + fmtDate(localStartedAt);
+    document.getElementById('btnStart').classList.add('hidden');
+    document.getElementById('btnStop').classList.remove('hidden');
+    document.getElementById('liveBadge').className = 'badge badge-ok';
+    document.getElementById('liveBadge').textContent = 'EM PATRULHA';
+
+    // enquanto pendente, não deixa encerrar ainda
+    btnStop.disabled = true;
+
+    runTimer();
+
+    // 2) grava no banco
     const { data, error } = await supabaseClient
       .from('shifts')
-      .insert([{ rank_id: currentRank?.id ?? null }])  // ✅ não envia officer_id
-      .select().single();
+      .insert([{ rank_id: currentRank?.id ?? null }])
+      .select()
+      .single();
 
-    setBusy(btn, false);
+    setBusy(btnStart, false);
 
-    if (error) return toast('Erro: ' + error.message, 'err');
+    if (error) {
+      toast('Erro ao iniciar patrulha: ' + error.message, 'err');
+      activeShift = null;
+      stopTimer();
+      btnStop.disabled = false;
+      await refreshState(false);
+      return;
+    }
 
+    // 3) sincroniza com o registro real
     activeShift = data;
+    btnStop.disabled = false;
 
-    runTimer(); // ✅ começa na hora
     toast('Patrulha iniciada.', 'ok');
 
-    refreshState(false);
+    // atualiza listas sem travar timer
+    loadMyShifts();
     loadWeeklyStats_v2();
   }
 
   async function endShift(){
     if (!currentUser) return toast('Faça login.', 'warn');
     if (!activeShift) return toast('Nenhuma patrulha em andamento.', 'warn');
+
+    if (activeShift._pending || !activeShift.id) {
+      return toast('Aguarde confirmar o início para encerrar.', 'warn');
+    }
 
     const btn = document.getElementById('btnStop');
     setBusy(btn, true);
@@ -655,9 +686,10 @@
     setBusy(btn, false);
 
     if (error) return toast('Erro: ' + error.message, 'err');
+
     toast('Patrulha encerrada.', 'ok');
     activeShift = null;
-    refreshState(false);
+    await refreshState(false);
     loadWeeklyStats_v2();
   }
 
@@ -732,7 +764,6 @@
 
     const rankMap = Object.fromEntries((ranks||[]).map(r=>[String(r.id), r.name]));
 
-    // shifts que tocam a semana
     const { data: sA } = await supabaseClient
       .from('shifts').select('officer_id, rank_id, started_at, ended_at')
       .gte('started_at', startIso).lt('started_at', endIso);
@@ -778,7 +809,6 @@
       if (lastRank) lastRankInWeek.set(officerId, lastRank);
     }
 
-    // fallback rank
     const needFallback = (officers||[]).filter(o => !lastRankInWeek.has(o.id));
     if (needFallback.length) {
       const ids = needFallback.map(o=>o.id);
@@ -797,15 +827,7 @@
       }
     }
 
-    let officersList = officers || [];
-    if ((!officersList || officersList.length === 0) && totalsSecs.size) {
-      const ids = [...totalsSecs.keys()];
-      const { data: off2 } = await supabaseClient
-        .from('officers').select('id,name,current_rank_id').in('id', ids);
-      officersList = off2 || [];
-    }
-
-    const rows = (officersList||[]).map(o=>{
+    const rows = (officers||[]).map(o=>{
       const secs = totalsSecs.get(o.id) || 0;
       const rankIdToShow = lastRankInWeek.get(o.id) ?? o.current_rank_id ?? null;
       const rankName = rankIdToShow ? (rankMap[String(rankIdToShow)] || '-') : '-';
@@ -841,5 +863,4 @@
   </script>
 </body>
 </html>
-
 
